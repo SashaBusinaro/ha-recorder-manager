@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.2
+
+### Changed
+- Chore: removed redundant configuration keys to follow linter best practices.
+
 ## 0.1.1
 
 ### Changed

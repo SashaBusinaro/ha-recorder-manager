@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-03-28 — Phase 3: v0.1.2 Maintenance
+- implemented: Cleaned up redundant default keys in `config.yaml` to address linter errors (`boot`, `ingress_port`, `options`, `panel_admin`, `schema`, `startup`)
+
 ## 2026-03-27 — Phase 3: v0.1.1 Updates
 - implemented: Converted raw database row count metric to true DB size bytes (`SUM(LENGTH(shared_attrs))`) to resolve visual parity bugs
 - implemented: UX improvements allowing filter tagging via blur events
