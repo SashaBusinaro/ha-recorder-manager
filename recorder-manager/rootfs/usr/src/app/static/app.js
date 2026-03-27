@@ -1,0 +1,497 @@
+/**
+ * Recorder Manager — Frontend Application
+ *
+ * Single-page app for managing HA recorder entity filters.
+ */
+
+(function () {
+  "use strict";
+
+  // ===== Base Path (injected by server from X-Ingress-Path) =====
+  const BASE_PATH = document.body.dataset.ingressPath || "";
+
+  // ===== State =====
+  const state = {
+    entities: [],
+    filters: { include: {}, exclude: {} },
+    sort: { key: "row_count", dir: "desc" },
+    search: "",
+    domainFilter: "",
+    statusFilter: "",
+    dirty: false,
+  };
+
+  // ===== DOM References =====
+  const $ = (sel) => document.querySelector(sel);
+  const $$ = (sel) => document.querySelectorAll(sel);
+
+  const dom = {
+    dbSize: $("#db-size"),
+    totalRows: $("#total-rows"),
+    entityCount: $("#entity-count"),
+    searchInput: $("#search-input"),
+    domainFilter: $("#domain-filter"),
+    statusFilter: $("#status-filter"),
+    tbody: $("#entity-tbody"),
+    btnRefresh: $("#btn-refresh"),
+    btnApply: $("#btn-apply"),
+    btnPreview: $("#btn-preview"),
+    btnClearFilters: $("#btn-clear-filters"),
+    filterCount: $("#filter-count"),
+    modalOverlay: $("#modal-overlay"),
+    btnCancelApply: $("#btn-cancel-apply"),
+    btnConfirmApply: $("#btn-confirm-apply"),
+    toastContainer: $("#toast-container"),
+  };
+
+  // ===== Tag Inputs =====
+  const tagInputs = {
+    "inc-entities": { values: [], type: "include", key: "entities" },
+    "inc-domains": { values: [], type: "include", key: "domains" },
+    "inc-globs": { values: [], type: "include", key: "entity_globs" },
+    "exc-entities": { values: [], type: "exclude", key: "entities" },
+    "exc-domains": { values: [], type: "exclude", key: "domains" },
+    "exc-globs": { values: [], type: "exclude", key: "entity_globs" },
+  };
+
+  // ===== API Helper =====
+  async function api(path, options = {}) {
+    const resp = await fetch(BASE_PATH + path, {
+      headers: { "Content-Type": "application/json" },
+      ...options,
+    });
+    if (!resp.ok) {
+      const data = await resp.json().catch(() => ({}));
+      throw new Error(data.error || data.message || `HTTP ${resp.status}`);
+    }
+    return resp.json();
+  }
+
+  // ===== Data Loading =====
+  async function loadEntities() {
+    try {
+      const data = await api("/api/entities");
+      state.entities = data.entities || [];
+      populateDomainFilter();
+      renderTable();
+    } catch (err) {
+      showToast("Failed to load entities: " + err.message, "error");
+    }
+  }
+
+  async function loadOverview() {
+    try {
+      const data = await api("/api/db/overview");
+      dom.dbSize.textContent = data.file_size_mb + " MB";
+      dom.totalRows.textContent = formatNumber(data.total_rows);
+      dom.entityCount.textContent = formatNumber(data.entity_count);
+    } catch (err) {
+      showToast("Failed to load DB overview: " + err.message, "error");
+    }
+  }
+
+  async function loadFilters() {
+    try {
+      const data = await api("/api/filters");
+      state.filters = data;
+      syncTagInputsFromState();
+      updateFilterCount();
+    } catch (err) {
+      showToast("Failed to load filters: " + err.message, "error");
+    }
+  }
+
+  async function refresh() {
+    dom.btnRefresh.disabled = true;
+    await Promise.all([loadOverview(), loadFilters(), loadEntities()]);
+    dom.btnRefresh.disabled = false;
+    showToast("Data refreshed", "info");
+  }
+
+  // ===== Table Rendering =====
+  function getFilteredEntities() {
+    let list = state.entities;
+
+    if (state.search) {
+      const q = state.search.toLowerCase();
+      list = list.filter(
+        (e) =>
+          e.entity_id.toLowerCase().includes(q) ||
+          e.domain.toLowerCase().includes(q)
+      );
+    }
+
+    if (state.domainFilter) {
+      list = list.filter((e) => e.domain === state.domainFilter);
+    }
+
+    if (state.statusFilter) {
+      list = list.filter((e) => e.filter_status === state.statusFilter);
+    }
+
+    // Sort
+    const { key, dir } = state.sort;
+    const mult = dir === "asc" ? 1 : -1;
+    list.sort((a, b) => {
+      let va = a[key];
+      let vb = b[key];
+      if (typeof va === "string") {
+        return mult * va.localeCompare(vb);
+      }
+      return mult * (va - vb);
+    });
+
+    return list;
+  }
+
+  function renderTable() {
+    const entities = getFilteredEntities();
+    if (entities.length === 0) {
+      dom.tbody.innerHTML = `
+        <tr><td colspan="7" style="text-align:center;padding:40px;color:var(--color-text-secondary)">
+          No entities found
+        </td></tr>`;
+      return;
+    }
+
+    dom.tbody.innerHTML = entities
+      .map((e) => {
+        const isExcluded = e.filter_status === "excluded";
+        const statusClass = isExcluded ? "status-excluded" : "status-included";
+        const rowClass = isExcluded ? "excluded-row" : "";
+        const statusLabel = isExcluded ? "Excluded" : "Included";
+
+        return `<tr class="${rowClass}">
+          <td class="entity-id-cell">${escapeHtml(e.entity_id)}</td>
+          <td class="domain-cell">${escapeHtml(e.domain)}</td>
+          <td class="numeric-cell">${formatNumber(e.row_count)}</td>
+          <td class="numeric-cell">${e.writes_per_minute.toFixed(2)}</td>
+          <td><span class="status-badge ${statusClass}">${statusLabel}</span></td>
+          <td class="reason-cell">${escapeHtml(e.filter_reason)}</td>
+          <td>
+            <div class="action-buttons">
+              ${
+                isExcluded
+                  ? `<button class="btn btn-sm btn-include" data-action="include" data-entity="${escapeAttr(e.entity_id)}">Include</button>`
+                  : `<button class="btn btn-sm btn-exclude" data-action="exclude" data-entity="${escapeAttr(e.entity_id)}">Exclude</button>`
+              }
+            </div>
+          </td>
+        </tr>`;
+      })
+      .join("");
+
+    // Update sort indicators
+    $$(".entity-table thead th").forEach((th) => {
+      th.classList.remove("sort-asc", "sort-desc");
+      if (th.dataset.sort === state.sort.key) {
+        th.classList.add("sort-" + state.sort.dir);
+      }
+    });
+  }
+
+  function populateDomainFilter() {
+    const domains = [
+      ...new Set(state.entities.map((e) => e.domain)),
+    ].sort();
+    dom.domainFilter.innerHTML =
+      '<option value="">All Domains</option>' +
+      domains.map((d) => `<option value="${d}">${d}</option>`).join("");
+  }
+
+  // ===== Tag Input Management =====
+  function initTagInputs() {
+    Object.keys(tagInputs).forEach((id) => {
+      const input = $(`#${id}-input`);
+      const tagsContainer = $(`#${id}-tags`);
+
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && input.value.trim()) {
+          e.preventDefault();
+          addTag(id, input.value.trim());
+          input.value = "";
+        }
+        if (
+          e.key === "Backspace" &&
+          !input.value &&
+          tagInputs[id].values.length
+        ) {
+          removeTag(id, tagInputs[id].values.length - 1);
+        }
+      });
+    });
+  }
+
+  function addTag(inputId, value) {
+    const config = tagInputs[inputId];
+    if (config.values.includes(value)) return;
+    config.values.push(value);
+    renderTags(inputId);
+    syncStateFromTagInputs();
+    markDirty();
+  }
+
+  function removeTag(inputId, index) {
+    tagInputs[inputId].values.splice(index, 1);
+    renderTags(inputId);
+    syncStateFromTagInputs();
+    markDirty();
+  }
+
+  function renderTags(inputId) {
+    const container = $(`#${inputId}-tags`);
+    container.innerHTML = tagInputs[inputId].values
+      .map(
+        (v, i) =>
+          `<span class="tag">${escapeHtml(v)}<button class="tag-remove" data-input="${inputId}" data-index="${i}">&times;</button></span>`
+      )
+      .join("");
+
+    // Re-bind remove buttons
+    container.querySelectorAll(".tag-remove").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        removeTag(btn.dataset.input, parseInt(btn.dataset.index));
+      });
+    });
+  }
+
+  function syncTagInputsFromState() {
+    Object.keys(tagInputs).forEach((id) => {
+      const { type, key } = tagInputs[id];
+      const section = state.filters[type] || {};
+      tagInputs[id].values = [...(section[key] || [])];
+      renderTags(id);
+    });
+  }
+
+  function syncStateFromTagInputs() {
+    state.filters.include = {};
+    state.filters.exclude = {};
+
+    Object.keys(tagInputs).forEach((id) => {
+      const { type, key, values } = tagInputs[id];
+      if (values.length > 0) {
+        if (!state.filters[type]) state.filters[type] = {};
+        state.filters[type][key] = [...values];
+      }
+    });
+
+    updateFilterCount();
+  }
+
+  function updateFilterCount() {
+    let count = 0;
+    ["include", "exclude"].forEach((type) => {
+      const section = state.filters[type] || {};
+      ["entities", "domains", "entity_globs"].forEach((key) => {
+        count += (section[key] || []).length;
+      });
+    });
+    dom.filterCount.textContent = count + " rule" + (count !== 1 ? "s" : "");
+  }
+
+  // ===== Filter Actions =====
+  function addEntityFilter(entityId, action) {
+    const type = action === "include" ? "include" : "exclude";
+    const oppositeType = action === "include" ? "exclude" : "include";
+
+    // Add to target type
+    if (!state.filters[type]) state.filters[type] = {};
+    if (!state.filters[type].entities) state.filters[type].entities = [];
+    if (!state.filters[type].entities.includes(entityId)) {
+      state.filters[type].entities.push(entityId);
+    }
+
+    // Remove from opposite type if present
+    if (state.filters[oppositeType]?.entities) {
+      state.filters[oppositeType].entities = state.filters[
+        oppositeType
+      ].entities.filter((e) => e !== entityId);
+    }
+
+    syncTagInputsFromState();
+    markDirty();
+    previewFilters();
+  }
+
+  async function previewFilters() {
+    try {
+      const data = await api("/api/filters/preview", {
+        method: "POST",
+        body: JSON.stringify(state.filters),
+      });
+
+      // Update entity statuses in state
+      const statusMap = {};
+      data.entities.forEach((e) => {
+        statusMap[e.entity_id] = {
+          filter_status: e.status,
+          filter_reason: e.reason,
+        };
+      });
+
+      state.entities.forEach((e) => {
+        if (statusMap[e.entity_id]) {
+          e.filter_status = statusMap[e.entity_id].filter_status;
+          e.filter_reason = statusMap[e.entity_id].filter_reason;
+        }
+      });
+
+      renderTable();
+    } catch (err) {
+      showToast("Preview failed: " + err.message, "error");
+    }
+  }
+
+  async function applyFilters() {
+    dom.btnConfirmApply.disabled = true;
+    dom.btnConfirmApply.textContent = "Applying...";
+
+    try {
+      const data = await api("/api/apply", {
+        method: "POST",
+        body: JSON.stringify(state.filters),
+      });
+
+      dom.modalOverlay.hidden = true;
+      state.dirty = false;
+      dom.btnApply.disabled = true;
+      showToast(data.message, "success");
+    } catch (err) {
+      dom.modalOverlay.hidden = true;
+      showToast("Apply failed: " + err.message, "error");
+    } finally {
+      dom.btnConfirmApply.disabled = false;
+      dom.btnConfirmApply.textContent = "Confirm & Restart";
+    }
+  }
+
+  function markDirty() {
+    state.dirty = true;
+    dom.btnApply.disabled = false;
+  }
+
+  // ===== Toast Notifications =====
+  function showToast(message, type = "info") {
+    const toast = document.createElement("div");
+    toast.className = `toast ${type}`;
+    toast.textContent = message;
+    dom.toastContainer.appendChild(toast);
+    setTimeout(() => {
+      toast.style.opacity = "0";
+      toast.style.transition = "opacity 0.3s ease";
+      setTimeout(() => toast.remove(), 300);
+    }, 4000);
+  }
+
+  // ===== Utilities =====
+  function formatNumber(n) {
+    return n.toLocaleString();
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement("div");
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function escapeAttr(str) {
+    return str
+      .replace(/&/g, "&amp;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+
+  // ===== Event Listeners =====
+  function bindEvents() {
+    // Sort headers
+    $$(".entity-table thead th.sortable").forEach((th) => {
+      th.addEventListener("click", () => {
+        const key = th.dataset.sort;
+        if (state.sort.key === key) {
+          state.sort.dir = state.sort.dir === "asc" ? "desc" : "asc";
+        } else {
+          state.sort.key = key;
+          state.sort.dir = key === "entity_id" || key === "domain" ? "asc" : "desc";
+        }
+        renderTable();
+      });
+    });
+
+    // Search
+    dom.searchInput.addEventListener("input", (e) => {
+      state.search = e.target.value;
+      renderTable();
+    });
+
+    // Domain filter
+    dom.domainFilter.addEventListener("change", (e) => {
+      state.domainFilter = e.target.value;
+      renderTable();
+    });
+
+    // Status filter
+    dom.statusFilter.addEventListener("change", (e) => {
+      state.statusFilter = e.target.value;
+      renderTable();
+    });
+
+    // Refresh
+    dom.btnRefresh.addEventListener("click", refresh);
+
+    // Preview
+    dom.btnPreview.addEventListener("click", previewFilters);
+
+    // Clear filters
+    dom.btnClearFilters.addEventListener("click", () => {
+      state.filters = { include: {}, exclude: {} };
+      syncTagInputsFromState();
+      updateFilterCount();
+      markDirty();
+      previewFilters();
+    });
+
+    // Apply button -> show modal
+    dom.btnApply.addEventListener("click", () => {
+      dom.modalOverlay.hidden = false;
+    });
+
+    // Modal cancel
+    dom.btnCancelApply.addEventListener("click", () => {
+      dom.modalOverlay.hidden = true;
+    });
+
+    // Modal confirm
+    dom.btnConfirmApply.addEventListener("click", applyFilters);
+
+    // Close modal on overlay click
+    dom.modalOverlay.addEventListener("click", (e) => {
+      if (e.target === dom.modalOverlay) {
+        dom.modalOverlay.hidden = true;
+      }
+    });
+
+    // Entity action buttons (delegated)
+    dom.tbody.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-action]");
+      if (!btn) return;
+      addEntityFilter(btn.dataset.entity, btn.dataset.action);
+    });
+  }
+
+  // ===== Initialization =====
+  async function init() {
+    bindEvents();
+    initTagInputs();
+    await refresh();
+  }
+
+  // Start when DOM is ready
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
+})();

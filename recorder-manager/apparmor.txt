@@ -1,0 +1,45 @@
+#include <tunables/global>
+
+profile recorder-manager flags=(attach_disconnected,mediate_deleted) {
+  #include <abstractions/base>
+
+  # Capabilities
+  file,
+  signal (send) set=(kill,term,int,hup,cont),
+
+  # S6-Overlay
+  /init ix,
+  /bin/** ix,
+  /usr/bin/** ix,
+  /run/{s6,s6-rc*,service}/** ix,
+  /package/** ix,
+  /command/** ix,
+  /etc/services.d/** rwix,
+  /etc/cont-init.d/** rwix,
+  /etc/cont-finish.d/** rwix,
+  /run/{,**} rwk,
+  /dev/tty rw,
+
+  # Bashio
+  /usr/lib/bashio/** ix,
+  /tmp/** rwk,
+
+  # Access to options.json and other files within the addon
+  /data/** rw,
+
+  # Python runtime
+  /usr/local/bin/python3* ix,
+  /usr/local/lib/python3*/** r,
+  /usr/lib/python3*/** r,
+  /usr/src/app/** r,
+
+  # Read-only access to HA config directory (for database)
+  /homeassistant/** r,
+  # Write access to recorder_filters.yaml
+  /homeassistant/recorder_filters.yaml rw,
+  /homeassistant/recorder_filters.yaml.bak rw,
+
+  # Network access (HTTP to Supervisor API)
+  network inet stream,
+  network inet6 stream,
+}

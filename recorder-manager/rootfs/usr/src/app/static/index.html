@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Recorder Manager</title>
+  <link rel="stylesheet" href="__INGRESS_PATH__/static/style.css">
+</head>
+<body data-ingress-path="__INGRESS_PATH__">
+  <div class="app">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-title">
+        <svg class="header-icon" viewBox="0 0 24 24"><path fill="currentColor" d="M12 3C7.58 3 4 4.79 4 7V17C4 19.21 7.59 21 12 21S20 19.21 20 17V7C20 4.79 16.42 3 12 3M18 17C18 17.5 15.87 19 12 19S6 17.5 6 17V14.77C7.61 15.55 9.72 16 12 16S16.39 15.55 18 14.77V17M18 12.45C16.7 13.4 14.42 14 12 14C9.58 14 7.3 13.4 6 12.45V9.64C7.47 10.47 9.61 11 12 11C14.39 11 16.53 10.47 18 9.64V12.45M12 9C8.13 9 6 7.5 6 7S8.13 5 12 5 18 6.5 18 7 15.87 9 12 9Z"/></svg>
+        <h1>Recorder Manager</h1>
+      </div>
+      <div class="header-stats" id="header-stats">
+        <div class="stat-card">
+          <span class="stat-label">Database Size</span>
+          <span class="stat-value" id="db-size">—</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Total Rows</span>
+          <span class="stat-value" id="total-rows">—</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Entities</span>
+          <span class="stat-value" id="entity-count">—</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Toolbar -->
+    <div class="toolbar">
+      <div class="toolbar-left">
+        <div class="search-box">
+          <svg class="search-icon" viewBox="0 0 24 24"><path fill="currentColor" d="M9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.44,13.73L14.71,14H15.5L20.5,19L19,20.5L14,15.5V14.71L13.73,14.44C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3M9.5,5C7,5 5,7 5,9.5C5,12 7,14 9.5,14C12,14 14,12 14,9.5C14,7 12,5 9.5,5Z"/></svg>
+          <input type="text" id="search-input" placeholder="Search entities..." autocomplete="off">
+        </div>
+        <select id="domain-filter" class="select-control">
+          <option value="">All Domains</option>
+        </select>
+        <select id="status-filter" class="select-control">
+          <option value="">All Statuses</option>
+          <option value="included">Included</option>
+          <option value="excluded">Excluded</option>
+        </select>
+      </div>
+      <div class="toolbar-right">
+        <button class="btn btn-secondary" id="btn-refresh" title="Refresh data">
+          <svg class="btn-icon" viewBox="0 0 24 24"><path fill="currentColor" d="M17.65,6.35C16.2,4.9 14.21,4 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20C15.73,20 18.84,17.45 19.73,14H17.65C16.83,16.33 14.61,18 12,18A6,6 0 0,1 6,12A6,6 0 0,1 12,6C13.66,6 15.14,6.69 16.22,7.78L13,11H20V4L17.65,6.35Z"/></svg>
+          Refresh
+        </button>
+        <button class="btn btn-primary" id="btn-apply" disabled title="Apply filters and restart HA">
+          <svg class="btn-icon" viewBox="0 0 24 24"><path fill="currentColor" d="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z"/></svg>
+          Apply &amp; Restart
+        </button>
+      </div>
+    </div>
+
+    <!-- Filter Rules Panel -->
+    <details class="filter-panel" id="filter-panel">
+      <summary class="filter-panel-header">
+        <svg class="filter-icon" viewBox="0 0 24 24"><path fill="currentColor" d="M14,12V19.88C14.04,20.18 13.94,20.5 13.71,20.71C13.32,21.1 12.69,21.1 12.3,20.71L10.29,18.7C10.06,18.47 9.96,18.16 10,17.87V12H9.97L4.21,4.62C3.87,4.19 3.95,3.56 4.38,3.22C4.57,3.08 4.78,3 5,3H19C19.22,3 19.43,3.08 19.62,3.22C20.05,3.56 20.13,4.19 19.79,4.62L14.03,12H14Z"/></svg>
+        <span>Filter Rules</span>
+        <span class="filter-badge" id="filter-count">0 rules</span>
+      </summary>
+      <div class="filter-panel-body">
+        <div class="filter-sections">
+          <!-- Include section -->
+          <div class="filter-section">
+            <h3 class="filter-section-title include-title">
+              <svg viewBox="0 0 24 24" class="section-icon"><path fill="currentColor" d="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z"/></svg>
+              Include Rules
+            </h3>
+            <div class="filter-group">
+              <label>Entities</label>
+              <div class="tag-input-container" id="inc-entities-container">
+                <div class="tags" id="inc-entities-tags"></div>
+                <input type="text" class="tag-input" id="inc-entities-input" placeholder="Type entity_id and press Enter">
+              </div>
+            </div>
+            <div class="filter-group">
+              <label>Domains</label>
+              <div class="tag-input-container" id="inc-domains-container">
+                <div class="tags" id="inc-domains-tags"></div>
+                <input type="text" class="tag-input" id="inc-domains-input" placeholder="e.g. sensor, switch">
+              </div>
+            </div>
+            <div class="filter-group">
+              <label>Entity Globs</label>
+              <div class="tag-input-container" id="inc-globs-container">
+                <div class="tags" id="inc-globs-tags"></div>
+                <input type="text" class="tag-input" id="inc-globs-input" placeholder="e.g. sensor.weather_*">
+              </div>
+            </div>
+          </div>
+
+          <!-- Exclude section -->
+          <div class="filter-section">
+            <h3 class="filter-section-title exclude-title">
+              <svg viewBox="0 0 24 24" class="section-icon"><path fill="currentColor" d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z"/></svg>
+              Exclude Rules
+            </h3>
+            <div class="filter-group">
+              <label>Entities</label>
+              <div class="tag-input-container" id="exc-entities-container">
+                <div class="tags" id="exc-entities-tags"></div>
+                <input type="text" class="tag-input" id="exc-entities-input" placeholder="Type entity_id and press Enter">
+              </div>
+            </div>
+            <div class="filter-group">
+              <label>Domains</label>
+              <div class="tag-input-container" id="exc-domains-container">
+                <div class="tags" id="exc-domains-tags"></div>
+                <input type="text" class="tag-input" id="exc-domains-input" placeholder="e.g. automation, script">
+              </div>
+            </div>
+            <div class="filter-group">
+              <label>Entity Globs</label>
+              <div class="tag-input-container" id="exc-globs-container">
+                <div class="tags" id="exc-globs-tags"></div>
+                <input type="text" class="tag-input" id="exc-globs-input" placeholder="e.g. sensor.sun*">
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="filter-actions">
+          <button class="btn btn-secondary" id="btn-preview">Preview Changes</button>
+          <button class="btn btn-danger" id="btn-clear-filters">Clear All</button>
+        </div>
+      </div>
+    </details>
+
+    <!-- Entity Table -->
+    <div class="table-container">
+      <table class="entity-table" id="entity-table">
+        <thead>
+          <tr>
+            <th class="sortable" data-sort="entity_id">
+              Entity ID
+              <span class="sort-arrow"></span>
+            </th>
+            <th class="sortable" data-sort="domain">
+              Domain
+              <span class="sort-arrow"></span>
+            </th>
+            <th class="sortable numeric" data-sort="row_count">
+              Rows
+              <span class="sort-arrow"></span>
+            </th>
+            <th class="sortable numeric" data-sort="writes_per_minute">
+              Writes/min
+              <span class="sort-arrow"></span>
+            </th>
+            <th>Status</th>
+            <th>Reason</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="entity-tbody">
+          <tr class="loading-row">
+            <td colspan="7">
+              <div class="loading-spinner"></div>
+              <span>Loading entities...</span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Toast notifications -->
+    <div class="toast-container" id="toast-container"></div>
+  </div>
+
+  <!-- Confirmation modal -->
+  <div class="modal-overlay" id="modal-overlay" hidden>
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Apply Filters &amp; Restart</h2>
+      </div>
+      <div class="modal-body">
+        <p>This will:</p>
+        <ol>
+          <li>Save the filter configuration to <code>recorder_filters.yaml</code></li>
+          <li>Validate the Home Assistant configuration</li>
+          <li>Restart Home Assistant Core</li>
+        </ol>
+        <p class="modal-warning">
+          <svg viewBox="0 0 24 24" class="warning-icon"><path fill="currentColor" d="M13,14H11V10H13M13,18H11V16H13M1,21H23L12,2L1,21Z"/></svg>
+          Home Assistant will be temporarily unavailable during restart.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="btn-cancel-apply">Cancel</button>
+        <button class="btn btn-primary" id="btn-confirm-apply">Confirm &amp; Restart</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="__INGRESS_PATH__/static/app.js"></script>
+</body>
+</html>
