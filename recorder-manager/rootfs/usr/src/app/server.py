@@ -223,6 +223,7 @@ def _merge_entities(
             "entity_id": entity_id,
             "domain": domain,
             "row_count": stats.get("row_count", 0),
+            "size_bytes": stats.get("size_bytes", 0),
             "writes_per_minute": round(
                 stats.get("writes_per_minute", 0.0), 4
             ),

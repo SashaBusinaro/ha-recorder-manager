@@ -14,7 +14,7 @@
   const state = {
     entities: [],
     filters: { include: {}, exclude: {} },
-    sort: { key: "row_count", dir: "desc" },
+    sort: { key: "size_bytes", dir: "desc" },
     search: "",
     domainFilter: "",
     statusFilter: "",
@@ -164,7 +164,7 @@
         return `<tr class="${rowClass}">
           <td class="entity-id-cell">${escapeHtml(e.entity_id)}</td>
           <td class="domain-cell">${escapeHtml(e.domain)}</td>
-          <td class="numeric-cell">${formatNumber(e.row_count)}</td>
+          <td class="numeric-cell">${formatBytes(e.size_bytes)}</td>
           <td class="numeric-cell">${e.writes_per_minute.toFixed(2)}</td>
           <td><span class="status-badge ${statusClass}">${statusLabel}</span></td>
           <td class="reason-cell">${escapeHtml(e.filter_reason)}</td>
@@ -217,6 +217,13 @@
           tagInputs[id].values.length
         ) {
           removeTag(id, tagInputs[id].values.length - 1);
+        }
+      });
+
+      input.addEventListener("blur", () => {
+        if (input.value.trim()) {
+          addTag(id, input.value.trim());
+          input.value = "";
         }
       });
     });
@@ -387,6 +394,14 @@
   // ===== Utilities =====
   function formatNumber(n) {
     return n.toLocaleString();
+  }
+
+  function formatBytes(bytes) {
+    if (bytes === 0) return "0 B";
+    const k = 1024;
+    const sizes = ["B", "KB", "MB", "GB", "TB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   }
 
   function escapeHtml(str) {

@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-03-27 — Phase 3: v0.1.1 Updates
+- implemented: Converted raw database row count metric to true DB size bytes (`SUM(LENGTH(shared_attrs))`) to resolve visual parity bugs
+- implemented: UX improvements allowing filter tagging via blur events
+- implemented: Migrated the average `writes_per_minute` stat over lifetime to an exact sliding window measuring changes in the last 60 seconds (`last_updated_ts >= time.time() - 60`)
+
 ## 2026-03-25 — Phase 3: Initial Implementation (T1–T8)
 
 ### Add-on Scaffold (T1)
@@ -31,5 +36,5 @@
 
 ### Bug Fixes
 - Fixed `homeassistant_config` mount path: `/homeassistant` not `/homeassistant_config`
-- Added `gcc`, `musl-dev`, `python3-dev` build deps for aiohttp wheel compilation on Alpine
+- Downgraded base image to Python 3.13 (alpine3.21) to fix aiohttp wheel compilation issues
 - Fixed API fetch URLs to use ingress base path (`data-ingress-path` on body)

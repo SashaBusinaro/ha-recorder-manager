@@ -10,7 +10,7 @@ Visual database analytics and recorder filter manager for Home Assistant.
 This add-on provides a graphical interface for managing which entities are
 recorded by the Home Assistant Recorder integration. It helps you:
 
-- **See which entities consume the most database space** (by row count)
+- **See which entities consume the most database space** (by DB space)
 - **Identify the most chatty entities** (by writes per minute)
 - **Build include/exclude filters visually** — no YAML editing required
 - **Apply filters safely** — with config validation before restart

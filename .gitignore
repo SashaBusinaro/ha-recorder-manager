@@ -1,2 +1,5 @@
-.agents/rules/**
-.agents/instructions.md
+.agents/*
+!.agents/adr/
+!.agents/architecture.md
+!.agents/changelog.md
+!.agents/project.md

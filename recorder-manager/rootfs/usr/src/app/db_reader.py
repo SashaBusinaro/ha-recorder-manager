@@ -1,6 +1,7 @@
 """Read-only SQLite access to the Home Assistant recorder database."""
 
 import os
+import time
 import sqlite3
 import asyncio
 import logging
@@ -43,24 +44,22 @@ class DbReader:
             has_states_meta = cursor.fetchone() is not None
 
             if has_states_meta:
-                # Modern schema: states + states_meta
-                # Row count per entity
+                # Modern schema: states + states_meta + state_attributes
                 cursor.execute("""
                     SELECT sm.entity_id,
-                           COUNT(*) AS row_count,
-                           MIN(s.last_updated_ts) AS min_ts,
-                           MAX(s.last_updated_ts) AS max_ts
+                           COUNT(s.state_id) AS row_count,
+                           SUM(LENGTH(sa.shared_attrs)) AS size_bytes
                     FROM states s
                     JOIN states_meta sm ON s.metadata_id = sm.metadata_id
+                    LEFT JOIN state_attributes sa ON s.attributes_id = sa.attributes_id
                     GROUP BY sm.entity_id
                 """)
             else:
-                # Legacy schema: entity_id directly in states
+                # Legacy schema: entity_id and attributes directly in states
                 cursor.execute("""
                     SELECT entity_id,
                            COUNT(*) AS row_count,
-                           MIN(last_updated) AS min_ts,
-                           MAX(last_updated) AS max_ts
+                           SUM(LENGTH(attributes)) AS size_bytes
                     FROM states
                     GROUP BY entity_id
                 """)
@@ -68,32 +67,31 @@ class DbReader:
             for row in cursor.fetchall():
                 entity_id = row["entity_id"]
                 row_count = row["row_count"]
-                min_ts = row["min_ts"]
-                max_ts = row["max_ts"]
-
-                # Calculate writes per minute
-                writes_per_minute = 0.0
-                if (
-                    min_ts is not None
-                    and max_ts is not None
-                    and row_count > 1
-                ):
-                    # Timestamps are Unix epoch floats in modern schema
-                    try:
-                        time_span_minutes = (
-                            float(max_ts) - float(min_ts)
-                        ) / 60.0
-                        if time_span_minutes > 0:
-                            writes_per_minute = (
-                                row_count / time_span_minutes
-                            )
-                    except (ValueError, TypeError):
-                        writes_per_minute = 0.0
+                size_bytes = row["size_bytes"] or 0
 
                 stats[entity_id] = {
                     "row_count": row_count,
-                    "writes_per_minute": writes_per_minute,
+                    "writes_per_minute": 0.0,
+                    "size_bytes": size_bytes,
                 }
+
+            # Calculate actual writes per minute from the last 60 seconds
+            if has_states_meta:
+                one_minute_ago = time.time() - 60
+                cursor.execute("""
+                    SELECT sm.entity_id,
+                           COUNT(s.state_id) as changes_last_minute
+                    FROM states s
+                    JOIN states_meta sm ON s.metadata_id = sm.metadata_id
+                    WHERE s.last_updated_ts >= ?
+                    GROUP BY sm.entity_id
+                """, (one_minute_ago,))
+                
+                for row in cursor.fetchall():
+                    entity_id = row["entity_id"]
+                    changes = row["changes_last_minute"]
+                    if entity_id in stats:
+                        stats[entity_id]["writes_per_minute"] = float(changes)
 
             conn.close()
         except Exception as e:
@@ -109,8 +107,7 @@ class DbReader:
         total_rows = sum(s["row_count"] for s in stats.values())
         entity_count = len(stats)
 
-        # Format file size
-        file_size_mb = round(file_size / (1024 * 1024), 2)
+        file_size_mb = round(float(file_size) / 1048576.0, 2)
 
         return {
             "file_size_bytes": file_size,
@@ -120,12 +117,12 @@ class DbReader:
             "entities": [
                 {
                     "entity_id": eid,
-                    "row_count": s["row_count"],
+                    "size_bytes": s.get("size_bytes", 0),
                     "writes_per_minute": round(s["writes_per_minute"], 4),
                 }
                 for eid, s in sorted(
                     stats.items(),
-                    key=lambda x: x[1]["row_count"],
+                    key=lambda x: x[1].get("size_bytes", 0),
                     reverse=True,
                 )
             ],

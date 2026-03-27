@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.1
+
+### Changed
+- Replaced row count metric with actual database space occupied (bytes)
+- Replaced average `writes_per_minute` metric with a live sliding window capturing changes in the last 60 seconds
+- Improved filter tag UX to automatically add typed text when clicking elsewhere on the page
+- Downgraded base image to Python 3.13 (alpine3.21) to fix `aiohttp` builder issues instead of using `gcc` dependencies
+
 ## 0.1.0
 
 ### Added
