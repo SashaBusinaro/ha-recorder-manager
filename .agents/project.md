@@ -26,13 +26,18 @@ A Home Assistant add-on with an ingress-based web UI that provides:
    include/exclude filters using Home Assistant's native filter model:
    individual entities, entire domains, and entity glob patterns.
 
-3. **YAML fragment generator** — the add-on writes a standalone YAML file
-   into `/config/` that the user `!include`s into their `recorder:` block.
-   The add-on **never** modifies `configuration.yaml` or the database
-   directly; it only influences future recording behaviour.
+3. **Recorder configuration file** — the add-on writes a standalone YAML
+   file (`recorder_filters.yaml`) into `/config/` that replaces the user's
+   entire `recorder:` block via `recorder: !include recorder_filters.yaml`.
+   Because HA YAML does not allow `!include` as a sub-key inside a block,
+   all recorder settings (filters, `purge_keep_days`, `commit_interval`,
+   etc.) are managed inside this file. The add-on **never** modifies
+   `configuration.yaml` or the database directly; it only influences
+   future recording behaviour.
 
 The user installs the add-on, configures their filters visually, and applies
-the generated YAML with a single one-time `!include` edit to their config.
+the generated YAML with a single one-time edit to `configuration.yaml`:
+`recorder: !include recorder_filters.yaml`.
 
 ## user and context
 
@@ -78,18 +83,17 @@ the generated YAML with a single one-time `!include` edit to their config.
 - Show a live preview of which entities would be recorded vs. dropped based
   on the current filter configuration.
 
-### F3 — YAML fragment generation
-- Generate a valid standalone YAML fragment containing **only** the
-  `include:` and `exclude:` sub-keys (not the full `recorder:` block).
-- The user keeps their other recorder settings (`db_url`,
-  `purge_keep_days`, etc.) and includes the fragment via:
+### F3 — Recorder configuration file
+- Generate a valid standalone YAML file containing the **complete**
+  `recorder` configuration: include/exclude filters as well as any other
+  recorder settings (`purge_keep_days`, `commit_interval`, `db_url`,
+  `auto_purge`, `auto_repack`, `db_max_retries`, `db_retry_wait`).
+- Because HA YAML does not allow `!include` as a sub-key inside a block,
+  the user replaces their entire `recorder:` block with:
   ```yaml
-  recorder:
-    purge_keep_days: 10
-    !include recorder_filters.yaml
+  recorder: !include recorder_filters.yaml
   ```
-- Write the file to a known path under `/config/` (e.g.,
-  `/config/recorder_filters.yaml`).
+- Write the file to `/config/recorder_filters.yaml`.
 - The add-on manages this file exclusively; the user never hand-edits it.
 
 ### F4 — Ingress web UI

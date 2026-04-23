@@ -30,6 +30,18 @@
       </div>
     </header>
 
+    <!-- Setup Notification Banner -->
+    <div class="setup-banner" id="setup-banner" hidden>
+      <div class="setup-banner-body">
+        <svg viewBox="0 0 24 24" width="20" height="20" style="flex-shrink:0"><path fill="currentColor" d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M11,17V11H13V17H11M11,9V7H13V9H11Z"/></svg>
+        <span id="setup-banner-msg"></span>
+      </div>
+      <div class="setup-banner-actions">
+        <button class="btn btn-sm btn-primary" id="setup-banner-cta"></button>
+        <button class="btn btn-sm btn-secondary" id="setup-banner-dismiss" title="Dismiss">&times;</button>
+      </div>
+    </div>
+
     <!-- Toolbar -->
     <div class="toolbar">
       <div class="toolbar-left">
@@ -182,7 +194,7 @@
       <div class="modal-body">
         <p>This will:</p>
         <ol>
-          <li>Save the filter configuration to <code>recorder_filters.yaml</code></li>
+          <li>Save the filter configuration to <code>recorder_include.yaml</code> and <code>recorder_exclude.yaml</code></li>
           <li>Validate the Home Assistant configuration</li>
           <li>Restart Home Assistant Core</li>
         </ol>
@@ -195,6 +207,153 @@
         <button class="btn btn-secondary" id="btn-cancel-apply">Cancel</button>
         <button class="btn btn-primary" id="btn-confirm-apply">Confirm &amp; Restart</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Setup Wizard Modal -->
+  <div class="modal-overlay" id="setup-overlay" hidden>
+    <div class="modal migration-modal" id="setup-modal">
+
+      <!-- MIGRATION: Step 1 — Detection -->
+      <div class="wizard-step" id="wiz-mig-1" hidden>
+        <div class="modal-header">
+          <div class="wizard-header-icon">
+            <svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M11.5,2C6.81,2 3,5.81 3,10.5S6.81,19 11.5,19H12V22C19.86,15.49 21,16.5 21,10.5C21,5.81 17.19,2 11.5,2M12.5,16.5H10.5V14.5H12.5V16.5M12.5,13H10.5C10.5,9.75 13.5,10 13.5,8C13.5,6.9 12.6,6 11.5,6C10.4,6 9.5,6.9 9.5,8H7.5C7.5,5.79 9.29,4 11.5,4C13.71,4 15.5,5.79 15.5,8C15.5,10.5 12.5,10.75 12.5,13Z"/></svg>
+          </div>
+          <h2>Existing Recorder Configuration Detected</h2>
+        </div>
+        <div class="modal-body">
+          <p>The add-on found an existing <code>recorder:</code> block in <code>configuration.yaml</code>.</p>
+          <p style="margin-top:10px">The <strong>Migration Wizard</strong> will copy your existing include/exclude filters into <code>recorder_include.yaml</code> and <code>recorder_exclude.yaml</code>, and guide you through replacing the inline blocks with two <code>!include</code> lines.</p>
+          <div class="wizard-note">
+            <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M11,17V11H13V17H11M11,9V7H13V9H11Z"/></svg>
+            <span><code>configuration.yaml</code> and the database are <strong>read-only</strong> for this add-on. Only <code>recorder_include.yaml</code> and <code>recorder_exclude.yaml</code> will be created or modified.</span>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" id="wiz-mig-1-cancel">Not now</button>
+          <button class="btn btn-primary" id="wiz-mig-1-next">
+            <svg class="btn-icon" viewBox="0 0 24 24"><path fill="currentColor" d="M8.59,16.58L13.17,12L8.59,7.41L10,6L16,12L10,18L8.59,16.58Z"/></svg>
+            Start Migration
+          </button>
+        </div>
+      </div>
+
+      <!-- MIGRATION: Step 2 — Copying & Manual Edit -->
+      <div class="wizard-step" id="wiz-mig-2" hidden>
+        <div class="modal-header">
+          <div class="wizard-step-badge">Step 1 of 2</div>
+          <h2>Edit <code>configuration.yaml</code></h2>
+        </div>
+        <div class="modal-body">
+          <div class="wizard-spinner-box" id="wiz-mig-copy-spinner">
+            <div class="loading-spinner"></div>
+            <span>Copying your existing include/exclude filters to <code>recorder_include.yaml</code> and <code>recorder_exclude.yaml</code>…</span>
+          </div>
+          <div id="wiz-mig-copy-done" hidden>
+            <p>Your existing include/exclude filters have been copied to <code>recorder_include.yaml</code> and <code>recorder_exclude.yaml</code>.</p>
+            <p style="margin-top:10px">Now <strong>replace the <code>include:</code> and <code>exclude:</code> blocks</strong> inside your <code>recorder:</code> section in <code>configuration.yaml</code> with these two lines:</p>
+            <pre class="wizard-snippet">include: !include recorder_include.yaml
+exclude: !include recorder_exclude.yaml</pre>
+            <div class="modal-warning">
+              <svg viewBox="0 0 24 24" class="warning-icon"><path fill="currentColor" d="M13,14H11V10H13M13,18H11V16H13M1,21H23L12,2L1,21Z"/></svg>
+              Remove the old inline include/exclude sub-keys and replace them with the two lines above. Your other settings (e.g. purge_keep_days) stay unchanged.
+            </div>
+          </div>
+          <div id="wiz-mig-copy-error" hidden class="wizard-result error"></div>
+        </div>
+        <div class="modal-footer" id="wiz-mig-2-footer" hidden>
+          <button class="btn btn-primary" id="wiz-mig-2-next">
+            <svg class="btn-icon" viewBox="0 0 24 24"><path fill="currentColor" d="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z"/></svg>
+            Edited, check and reboot to apply changes
+          </button>
+        </div>
+      </div>
+
+      <!-- MIGRATION: Step 3 — Check & Reboot Result -->
+      <div class="wizard-step" id="wiz-mig-3" hidden>
+        <div class="modal-header">
+          <div class="wizard-step-badge">Step 2 of 2</div>
+          <h2 id="wiz-mig-3-title">Checking Configuration…</h2>
+        </div>
+        <div class="modal-body">
+          <div class="wizard-spinner-box" id="wiz-mig-3-spinner">
+            <div class="loading-spinner"></div>
+            <span>Validating your Home Assistant configuration…</span>
+          </div>
+          <div id="wiz-mig-3-success" hidden>
+            <div class="wizard-success-icon">
+              <svg viewBox="0 0 24 24" width="48" height="48"><path fill="currentColor" d="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z"/></svg>
+            </div>
+            <p class="wizard-success-msg">Configuration valid!<br>Home Assistant is rebooting to apply changes.</p>
+            <p style="margin-top:8px;font-size:0.83rem;color:var(--color-text-secondary)">The add-on will be temporarily unavailable during restart.</p>
+          </div>
+          <div id="wiz-mig-3-error" hidden class="wizard-result error"></div>
+        </div>
+        <div class="modal-footer" id="wiz-mig-3-footer" hidden>
+          <button class="btn btn-secondary" id="wiz-mig-3-back" hidden>
+            <svg class="btn-icon" viewBox="0 0 24 24"><path fill="currentColor" d="M20,11V13H8L13.5,18.5L12.08,19.92L4.16,12L12.08,4.08L13.5,5.5L8,11H20Z"/></svg>
+            Go Back
+          </button>
+          <button class="btn btn-secondary" id="wiz-mig-3-close" hidden>Close</button>
+        </div>
+      </div>
+
+      <!-- FRESH SETUP: Step 1 — Instructions -->
+      <div class="wizard-step" id="wiz-fresh-1" hidden>
+        <div class="modal-header">
+          <div class="wizard-header-icon" style="background:rgba(48,209,88,0.1);color:var(--color-success)">
+            <svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M11,17V11H13V17H11M11,9V7H13V9H11Z"/></svg>
+          </div>
+          <h2>First-Time Setup</h2>
+        </div>
+        <div class="modal-body">
+          <p>To let this add-on manage your recorder filters, add these two lines inside your <code>recorder:</code> block in <code>configuration.yaml</code>:</p>
+          <pre class="wizard-snippet" style="margin-top:12px">recorder:
+  include: !include recorder_include.yaml
+  exclude: !include recorder_exclude.yaml</pre>
+          <div class="wizard-note" style="margin-top:14px">
+            <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 12,2M11,17V11H13V17H11M11,9V7H13V9H11Z"/></svg>
+            <span>If you already have a <code>recorder:</code> block, just add the two <code>!include</code> lines inside it. Your existing settings like <code>purge_keep_days</code> remain under your control and are not touched by this add-on.</span>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" id="wiz-fresh-1-cancel">Not now</button>
+          <button class="btn btn-primary" id="wiz-fresh-1-next">
+            <svg class="btn-icon" viewBox="0 0 24 24"><path fill="currentColor" d="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z"/></svg>
+            Edited, check and reboot to apply changes
+          </button>
+        </div>
+      </div>
+
+      <!-- FRESH SETUP: Step 2 — Check & Reboot Result (reuses same structure) -->
+      <div class="wizard-step" id="wiz-fresh-2" hidden>
+        <div class="modal-header">
+          <h2 id="wiz-fresh-2-title">Checking Configuration…</h2>
+        </div>
+        <div class="modal-body">
+          <div class="wizard-spinner-box" id="wiz-fresh-2-spinner">
+            <div class="loading-spinner"></div>
+            <span>Validating your Home Assistant configuration…</span>
+          </div>
+          <div id="wiz-fresh-2-success" hidden>
+            <div class="wizard-success-icon">
+              <svg viewBox="0 0 24 24" width="48" height="48"><path fill="currentColor" d="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z"/></svg>
+            </div>
+            <p class="wizard-success-msg">Configuration valid!<br>Home Assistant is rebooting to apply changes.</p>
+            <p style="margin-top:8px;font-size:0.83rem;color:var(--color-text-secondary)">The add-on will be temporarily unavailable during restart.</p>
+          </div>
+          <div id="wiz-fresh-2-error" hidden class="wizard-result error"></div>
+        </div>
+        <div class="modal-footer" id="wiz-fresh-2-footer" hidden>
+          <button class="btn btn-secondary" id="wiz-fresh-2-back" hidden>
+            <svg class="btn-icon" viewBox="0 0 24 24"><path fill="currentColor" d="M20,11V13H8L13.5,18.5L12.08,19.92L4.16,12L12.08,4.08L13.5,5.5L8,11H20Z"/></svg>
+            Go Back
+          </button>
+          <button class="btn btn-secondary" id="wiz-fresh-2-close" hidden>Close</button>
+        </div>
+      </div>
+
     </div>
   </div>
 

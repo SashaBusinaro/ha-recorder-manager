@@ -1,6 +1,6 @@
 # https://developers.home-assistant.io/docs/add-ons/configuration
 name: Recorder Manager
-version: "0.1.2"
+version: "1.0.0"
 slug: recorder-manager
 description: >-
   Visual database analytics and recorder filter manager.

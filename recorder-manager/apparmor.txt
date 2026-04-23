@@ -35,9 +35,11 @@ profile recorder-manager flags=(attach_disconnected,mediate_deleted) {
 
   # Read-only access to HA config directory (for database)
   /homeassistant/** r,
-  # Write access to recorder_filters.yaml
-  /homeassistant/recorder_filters.yaml rw,
-  /homeassistant/recorder_filters.yaml.bak rw,
+  # Write access to recorder_include.yaml and recorder_exclude.yaml
+  /homeassistant/recorder_include.yaml rw,
+  /homeassistant/recorder_include.yaml.bak rw,
+  /homeassistant/recorder_exclude.yaml rw,
+  /homeassistant/recorder_exclude.yaml.bak rw,
 
   # Network access (HTTP to Supervisor API)
   network inet stream,

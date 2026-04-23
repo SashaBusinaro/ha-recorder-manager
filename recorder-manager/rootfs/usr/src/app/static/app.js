@@ -103,9 +103,14 @@
 
   async function refresh() {
     dom.btnRefresh.disabled = true;
-    await Promise.all([loadOverview(), loadFilters(), loadEntities()]);
-    dom.btnRefresh.disabled = false;
-    showToast("Data refreshed", "info");
+    try {
+      await Promise.all([loadOverview(), loadFilters(), loadEntities()]);
+      showToast("Data refreshed", "info");
+    } catch (err) {
+      showToast("Refresh failed: " + err.message, "error");
+    } finally {
+      dom.btnRefresh.disabled = false;
+    }
   }
 
   // ===== Table Rendering =====
@@ -363,7 +368,7 @@
       dom.modalOverlay.hidden = true;
       state.dirty = false;
       dom.btnApply.disabled = true;
-      showToast(data.message, "success");
+      showToast(data.message || "Filters applied. Home Assistant is restarting.", "success");
     } catch (err) {
       dom.modalOverlay.hidden = true;
       showToast("Apply failed: " + err.message, "error");
@@ -496,11 +501,216 @@
     });
   }
 
+  // ===== Setup Wizard & Banner =====
+
+  const setupOverlay = $("#setup-overlay");
+  const setupModal = $("#setup-modal");
+
+  // All wizard step IDs
+  const ALL_STEPS = [
+    "wiz-mig-1", "wiz-mig-2", "wiz-mig-3",
+    "wiz-fresh-1", "wiz-fresh-2",
+  ];
+
+  function wizShowOnly(stepId) {
+    ALL_STEPS.forEach((id) => {
+      const el = $(`#${id}`);
+      if (el) el.hidden = id !== stepId;
+    });
+    setupOverlay.hidden = false;
+  }
+
+  // Make modal non-closable: remove backdrop-click behaviour
+  let wizClosable = true;
+
+  function wizLock() {
+    wizClosable = false;
+  }
+
+  function wizHide() {
+    setupOverlay.hidden = true;
+    wizClosable = true;
+  }
+
+  // ---- Shared check-and-reboot flow ----
+  async function wizRunCheckAndReboot(spinnerEl, successEl, errorEl, footerEl, backBtn, closeBtn, titleEl) {
+    // Show spinner
+    spinnerEl.hidden = false;
+    successEl.hidden = true;
+    errorEl.hidden = true;
+    footerEl.hidden = true;
+    if (titleEl) titleEl.textContent = "Checking Configuration\u2026";
+
+    try {
+      // Step 1: validate config
+      const checkResp = await api("/api/setup/check", { method: "POST" });
+      // checkResp.status === "ok"
+      // Show success state
+      spinnerEl.hidden = true;
+      successEl.hidden = false;
+      if (titleEl) titleEl.textContent = "Configuration Valid";
+      footerEl.hidden = false;
+      closeBtn.hidden = false;
+      backBtn.hidden = true;
+
+      // Step 2: trigger reboot (fire-and-forget from client side)
+      api("/api/setup/reboot", { method: "POST" }).catch(() => {});
+
+    } catch (err) {
+      spinnerEl.hidden = true;
+      errorEl.hidden = false;
+      errorEl.textContent = "\u26a0 Validation failed: " + err.message +
+        " — Please re-check your configuration.yaml and try again.";
+      if (titleEl) titleEl.textContent = "Validation Failed";
+      footerEl.hidden = false;
+      backBtn.hidden = false;
+      closeBtn.hidden = true;
+    }
+  }
+
+  // ---- Migration wizard ----
+  async function wizMigStart() {
+    wizShowOnly("wiz-mig-2");
+    wizLock();
+
+    const spinner = $("#wiz-mig-copy-spinner");
+    const done    = $("#wiz-mig-copy-done");
+    const errBox  = $("#wiz-mig-copy-error");
+    const footer  = $("#wiz-mig-2-footer");
+
+    spinner.hidden = false;
+    done.hidden = true;
+    errBox.hidden = true;
+    footer.hidden = true;
+
+    try {
+      await api("/api/migration/apply", { method: "POST" });
+      spinner.hidden = true;
+      done.hidden = false;
+      footer.hidden = false;
+    } catch (err) {
+      spinner.hidden = true;
+      errBox.hidden = false;
+      errBox.textContent = "\u26a0 Copy failed: " + err.message;
+      // Disable next, add a close button so user isn't permanently stuck
+      footer.hidden = false;
+      const nextBtn = $("#wiz-mig-2-next");
+      if (nextBtn) nextBtn.disabled = true;
+      let closeBtn = $("#wiz-mig-2-close");
+      if (!closeBtn) {
+        closeBtn = document.createElement("button");
+        closeBtn.className = "btn btn-secondary";
+        closeBtn.id = "wiz-mig-2-close";
+        closeBtn.textContent = "Close";
+        closeBtn.addEventListener("click", wizHide);
+        footer.appendChild(closeBtn);
+      }
+      closeBtn.hidden = false;
+    }
+  }
+
+  async function wizMigCheckReboot() {
+    wizShowOnly("wiz-mig-3");
+    await wizRunCheckAndReboot(
+      $("#wiz-mig-3-spinner"),
+      $("#wiz-mig-3-success"),
+      $("#wiz-mig-3-error"),
+      $("#wiz-mig-3-footer"),
+      $("#wiz-mig-3-back"),
+      $("#wiz-mig-3-close"),
+      $("#wiz-mig-3-title"),
+    );
+  }
+
+  // ---- Fresh-setup wizard ----
+  async function wizFreshStart() {
+    wizLock();
+    // Create the default filter file (no-op if exists)
+    api("/api/setup/init-default", { method: "POST" }).catch(() => {});
+  }
+
+  async function wizFreshCheckReboot() {
+    wizShowOnly("wiz-fresh-2");
+    await wizRunCheckAndReboot(
+      $("#wiz-fresh-2-spinner"),
+      $("#wiz-fresh-2-success"),
+      $("#wiz-fresh-2-error"),
+      $("#wiz-fresh-2-footer"),
+      $("#wiz-fresh-2-back"),
+      $("#wiz-fresh-2-close"),
+      $("#wiz-fresh-2-title"),
+    );
+  }
+
+  // ---- Banner & init ----
+  async function wizCheckSetup() {
+    try {
+      const data = await api("/api/setup/status");
+      if (data.setup_complete) return;
+
+      const banner    = $("#setup-banner");
+      const bannerMsg = $("#setup-banner-msg");
+      const bannerCta = $("#setup-banner-cta");
+
+      if (data.scenario === "migration") {
+        bannerMsg.textContent =
+          "Existing recorder configuration detected — use the Migration Wizard to import it.";
+        bannerCta.textContent = "Start Migration";
+        bannerCta.onclick = () => {
+          banner.hidden = true;
+          wizShowOnly("wiz-mig-1");
+        };
+      } else {
+        bannerMsg.textContent =
+          "Setup required — add include/exclude !include lines to your recorder: block in configuration.yaml.";
+        bannerCta.textContent = "Start Setup";
+        bannerCta.onclick = () => {
+          banner.hidden = true;
+          wizShowOnly("wiz-fresh-1");
+        };
+      }
+
+      banner.hidden = false;
+    } catch (err) {
+      // Non-critical — silent failure
+    }
+  }
+
+  function bindWizardEvents() {
+    const b = (id, fn) => { const el = $(id); if (el) el.addEventListener("click", fn); };
+
+    // Banner dismiss
+    b("#setup-banner-dismiss", () => { $("#setup-banner").hidden = true; });
+
+    // Migration wizard
+    b("#wiz-mig-1-cancel", () => wizHide());
+    b("#wiz-mig-1-next",   () => wizMigStart());
+    b("#wiz-mig-2-next",   () => wizMigCheckReboot());
+    b("#wiz-mig-3-back",   () => wizShowOnly("wiz-mig-2"));
+    b("#wiz-mig-3-close",  () => wizHide());
+
+    // Fresh-setup wizard
+    b("#wiz-fresh-1-cancel", () => wizHide());
+    b("#wiz-fresh-1-next",   () => wizFreshStart().then(wizFreshCheckReboot));
+    b("#wiz-fresh-2-back",   () => wizShowOnly("wiz-fresh-1"));
+    b("#wiz-fresh-2-close",  () => wizHide());
+
+    // Backdrop click — only when closable
+    if (setupOverlay) {
+      setupOverlay.addEventListener("click", (e) => {
+        if (wizClosable && e.target === setupOverlay) wizHide();
+      });
+    }
+  }
+
   // ===== Initialization =====
   async function init() {
     bindEvents();
+    bindWizardEvents();
     initTagInputs();
     await refresh();
+    // Check setup status after initial load (non-blocking)
+    wizCheckSetup();
   }
 
   // Start when DOM is ready

@@ -11,9 +11,13 @@ This add-on provides a graphical interface for managing which entities are
 recorded by the Home Assistant Recorder integration. It helps you:
 
 - **See which entities consume the most database space** (by DB space)
-- **Identify the most chatty entities** (by writes per minute)
+- **Identify the most chatty entities** (by writes per minute, live sliding window)
 - **Build include/exclude filters visually** — no YAML editing required
 - **Apply filters safely** — with config validation before restart
+- **Migrate existing filters** — guided wizard copies your current `recorder:` rules automatically
+
+The add-on is **read-only** for both the database and `configuration.yaml`.
+It only writes to its dedicated `recorder_include.yaml` and `recorder_exclude.yaml` files.
 
 Particularly useful for Raspberry Pi / SD card setups where minimizing
 database writes extends storage lifespan.

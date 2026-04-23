@@ -20,17 +20,19 @@ recorder filter management.
 │  │       │                              │                │  │
 │  │  ┌────▼──────────────┐  ┌────────────▼────────────┐   │  │
 │  │  │  DB Reader        │  │  YAML Writer            │   │  │
-│  │  │  (SQLite, r/o)    │  │  (recorder_filters.yaml)│   │  │
-│  │  └────┬──────────────┘  └────────────┬────────────┘   │  │
+│  │  │  (SQLite, r/o)    │  │  (recorder_include.yaml  │   │  │
+│  │  └────┬──────────────┘  │   recorder_exclude.yaml) │   │  │
+│  │       │                 └────────────┬─────────────┘   │  │
 │  │       │                              │                │  │
 │  └───────┼──────────────────────────────┼────────────────┘  │
 │          │                              │                    │
 │    ┌─────▼────────┐             ┌───────▼──────────┐        │
 │    │ /config/     │             │ /config/          │        │
-│    │ home-        │ (read-only) │ recorder_filters  │(write) │
+│    │ home-        │ (read-only) │ recorder_include  │(write) │
 │    │ assistant_   │             │ .yaml             │        │
-│    │ v2.db        │             │                   │        │
-│    └──────────────┘             └───────────────────┘        │
+│    │ v2.db        │             │ recorder_exclude  │        │
+│    └──────────────┘             │ .yaml             │        │
+│                                 └───────────────────┘        │
 │                                                              │
 │    ┌───────────────────────────────────────────┐             │
 │    │ Supervisor API (http://supervisor/)       │             │
@@ -107,6 +109,11 @@ recorder-manager/                     ← add-on folder (replaces example/)
 | POST | `/api/filters` | Save new filter config → write YAML |
 | POST | `/api/filters/preview` | Dry-run: evaluate filters, return per-entity status |
 | POST | `/api/apply` | Write YAML + config check + restart |
+| GET | `/api/setup/status` | Setup status: scenario (migration/fresh/complete), dismissed |
+| POST | `/api/setup/check-config` | Standalone config check (no restart) |
+| POST | `/api/setup/reboot` | Fire-and-forget HA Core restart |
+| POST | `/api/setup/init-default` | Create default recorder_include.yaml + recorder_exclude.yaml |
+| POST | `/api/migration/apply` | Copy inline include/exclude filters to managed files |
 
 ### C2 — DB Reader (`db_reader.py`)
 
@@ -183,19 +190,25 @@ def evaluate(entity_id, include, exclude) -> (status, reason):
 
 ### C5 — YAML Writer (`yaml_writer.py`)
 
-- Generates YAML fragment with only `include:` and `exclude:` sub-keys.
-- Output example:
+- Manages two files: `recorder_include.yaml` and `recorder_exclude.yaml`.
+- Each file contains only the filter dict for its direction (no wrapping key),
+  because the files are loaded as sub-key values:
   ```yaml
-  include:
-    entities:
-      - sensor.sun_today
-  exclude:
-    entity_globs:
-      - sensor.sun*
+  recorder:
+    include: !include recorder_include.yaml
+    exclude: !include recorder_exclude.yaml
   ```
-- Writes to `/config/recorder_filters.yaml`.
-- Before overwriting, backs up the current file to
-  `/config/recorder_filters.yaml.bak` for rollback.
+- Output example (`recorder_include.yaml`):
+  ```yaml
+  # Managed by Recorder Manager add-on
+  entities:
+    - sensor.sun_today
+  domains:
+    - light
+  ```
+- Before overwriting, backs up both files to
+  `/config/recorder_include.yaml.bak` and `/config/recorder_exclude.yaml.bak`
+  for rollback.
 
 ### C6 — Supervisor API Client (`supervisor_api.py`)
 
@@ -283,8 +296,8 @@ schema: {}
 ### Key configuration choices:
 - **`map: homeassistant_config:rw`** — maps `/config/` (HA config dir) into
   the container. Read-write is needed because the add-on writes
-  `recorder_filters.yaml` there. The DB file is read-only at the
-  application level (opened with `?mode=ro`).
+  `recorder_include.yaml` and `recorder_exclude.yaml` there. The DB file
+  is read-only at the application level (opened with `?mode=ro`).
 - **`hassio_role: homeassistant`** — grants access to `/core/check` and
   `/core/restart` Supervisor endpoints.
 - **`ingress: true`** — enables HA sidebar integration.
