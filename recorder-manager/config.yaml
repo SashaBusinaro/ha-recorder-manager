@@ -6,7 +6,7 @@ description: >-
   Visual database analytics and recorder filter manager.
   See which entities consume the most space and writes,
   then build include/exclude filters with a click
-url: "https://github.com/SashaBusinaro/Home-Assistant-Recorder-Manager"
+url: "https://github.com/SashaBusinaro/ha-recorder-manager"
 arch:
   - aarch64
   - amd64

@@ -119,7 +119,7 @@ The add-on operates with the following access model:
 ## Support
 
 Got questions? Open an issue on
-[GitHub](https://github.com/SashaBusinaro/Home-Assistant-Recorder-Manager).
+[GitHub](https://github.com/SashaBusinaro/ha-recorder-manager).
 
 ## License
 
