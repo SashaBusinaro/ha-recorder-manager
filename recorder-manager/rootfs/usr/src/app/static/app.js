@@ -18,6 +18,7 @@
     search: "",
     domainFilter: "",
     statusFilter: "",
+    limit: 100,   // matches the <option selected> in index.html
     dirty: false,
   };
 
@@ -32,6 +33,7 @@
     searchInput: $("#search-input"),
     domainFilter: $("#domain-filter"),
     statusFilter: $("#status-filter"),
+    limitSelect: $("#limit-select"),
     tbody: $("#entity-tbody"),
     btnRefresh: $("#btn-refresh"),
     btnApply: $("#btn-apply"),
@@ -70,7 +72,8 @@
   // ===== Data Loading =====
   async function loadEntities() {
     try {
-      const data = await api("/api/entities");
+      const qs = state.limit > 0 ? `?limit=${state.limit}` : "";
+      const data = await api(`/api/entities${qs}`);
       state.entities = data.entities || [];
       populateDomainFilter();
       renderTable();
@@ -456,6 +459,19 @@
     dom.statusFilter.addEventListener("change", (e) => {
       state.statusFilter = e.target.value;
       renderTable();
+    });
+
+    // Entity limit selector — triggers a server-side reload
+    dom.limitSelect.addEventListener("change", async (e) => {
+      state.limit = parseInt(e.target.value, 10);
+      dom.btnRefresh.disabled = true;
+      try {
+        await loadEntities();
+        const label = state.limit > 0 ? `Top ${state.limit} entities loaded` : "All entities loaded";
+        showToast(label, "info");
+      } finally {
+        dom.btnRefresh.disabled = false;
+      }
     });
 
     // Refresh

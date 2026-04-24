@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-04-24 — Entity Limit Selector
+- implemented: `GET /api/entities?limit=N` — backend now accepts a `limit` query param; entities are sorted by `size_bytes` descending before slicing so the heaviest entities are always returned first. `limit=0` returns all entities (legacy behaviour).
+- implemented: "Top N" selector dropdown in the toolbar (values: 25 / 100 / 250 / 500 / All); default is **Top 100** to keep initial load fast on large HA installations.
+- implemented: Changing the selector triggers a live reload from the server and shows a toast with the number of entities loaded.
+- verified: Backward-compatible — clients that do not send the `limit` param receive the same full response as before.
+
 ## 2026-04-23 — Phase 3: v1.0.0 — Filter-Only Split-File Architecture
 
 - decision: Switched from single-file full-recorder-block takeover (`recorder: !include recorder_filters.yaml`) to filter-only delegation using two files (`recorder_include.yaml`, `recorder_exclude.yaml`) as sub-key values inside the user's `recorder:` block

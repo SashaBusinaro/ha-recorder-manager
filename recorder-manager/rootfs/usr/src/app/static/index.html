@@ -57,6 +57,13 @@
           <option value="included">Included</option>
           <option value="excluded">Excluded</option>
         </select>
+        <select id="limit-select" class="select-control" title="Limit the number of entities loaded to speed up the interface">
+          <option value="25">Top 25</option>
+          <option value="100" selected>Top 100</option>
+          <option value="250">Top 250</option>
+          <option value="500">Top 500</option>
+          <option value="0">All entities</option>
+        </select>
       </div>
       <div class="toolbar-right">
         <button class="btn btn-secondary" id="btn-refresh" title="Refresh data">
