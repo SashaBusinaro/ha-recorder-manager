@@ -2,6 +2,7 @@
 
 import os
 import logging
+from contextlib import asynccontextmanager
 
 import aiohttp
 
@@ -21,7 +22,16 @@ class SupervisorApi:
             "Content-Type": "application/json",
         }
 
-    async def check_config(self) -> dict:
+    @asynccontextmanager
+    async def _session(self, session=None):
+        """Yield an aiohttp session — reuse *session* if provided, else create one."""
+        if session is not None:
+            yield session
+        else:
+            async with aiohttp.ClientSession() as s:
+                yield s
+
+    async def check_config(self, session=None) -> dict:
         """Validate the Home Assistant configuration.
 
         POST /core/check
@@ -30,8 +40,8 @@ class SupervisorApi:
             {"success": True/False, "message": "..."}
         """
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
+            async with self._session(session) as s:
+                async with s.post(
                     f"{self.BASE_URL}/core/check",
                     headers=self._get_headers(),
                     timeout=aiohttp.ClientTimeout(total=120),
@@ -51,7 +61,7 @@ class SupervisorApi:
             logger.error("Config check request failed: %s", e)
             return {"success": False, "message": str(e)}
 
-    async def restart_core(self) -> dict:
+    async def restart_core(self, session=None) -> dict:
         """Restart Home Assistant Core.
 
         POST /core/restart
@@ -60,8 +70,8 @@ class SupervisorApi:
             {"success": True/False, "message": "..."}
         """
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
+            async with self._session(session) as s:
+                async with s.post(
                     f"{self.BASE_URL}/core/restart",
                     headers=self._get_headers(),
                     timeout=aiohttp.ClientTimeout(total=120),
@@ -83,3 +93,4 @@ class SupervisorApi:
         except Exception as e:
             logger.error("Restart request failed: %s", e)
             return {"success": False, "message": str(e)}
+

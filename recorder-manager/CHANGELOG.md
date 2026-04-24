@@ -1,5 +1,41 @@
 # Changelog
 
+## [1.1.0] - 2026-04-25
+
+### Added
+- **Entity limit selector**: Toolbar dropdown ("Top 25 / 100 / 250 / 500 / All") limits
+  the number of entities fetched from the server. The default is **Top 100**, which
+  dramatically speeds up initial load on large HA installations. Entities are
+  sorted by database size descending before slicing, so the most impactful
+  entities always appear first.
+
+### Changed
+- **Writes/min metric**: Replaced the 60-second sliding window (which showed
+  `0.00` for most entities at page-load time) with a lifetime average computed
+  across the entity's full history in the database. The value is now stable and
+  meaningful even immediately after startup.
+- **Size column tooltip**: The "Size" column header now shows a tooltip
+  explaining that the value is an estimated/proportional metric due to Home
+  Assistant's shared attribute deduplication, not exact on-disk bytes.
+
+### Fixed
+- `GET /api/entities`: `total` field in the response now reflects the full
+  entity count before the limit is applied (was incorrectly returning the
+  sliced count).
+- `POST /api/filters` and `POST /api/apply`: Added input validation — malformed
+  payloads (wrong types for entities/domains/entity_globs) now return HTTP 400
+  instead of crashing the YAML writer.
+- SQLite connection is now always closed via `try/finally`, preventing a
+  resource leak when a query raised an exception.
+- Filter YAML writes are now atomic: content is written to a `.tmp` file and
+  renamed in place (`os.replace`), preventing partially written files on crash.
+- `asyncio.create_task` result from the reboot handler is now held in a strong
+  reference set, preventing premature garbage collection before the task
+  completes.
+- Domain filter dropdown now XSS-escapes domain names.
+- `formatNumber` and `formatBytes` in the UI are now guarded against
+  `null`/`undefined` values from unexpected server responses.
+
 ## [1.0.0] - 2026-04-23
 
 ### Added

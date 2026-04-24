@@ -204,7 +204,7 @@
     ].sort();
     dom.domainFilter.innerHTML =
       '<option value="">All Domains</option>' +
-      domains.map((d) => `<option value="${d}">${d}</option>`).join("");
+      domains.map((d) => `<option value="${escapeAttr(d)}">${escapeHtml(d)}</option>`).join("");
   }
 
   // ===== Tag Input Management =====
@@ -401,11 +401,11 @@
 
   // ===== Utilities =====
   function formatNumber(n) {
-    return n.toLocaleString();
+    return (n ?? 0).toLocaleString();
   }
 
   function formatBytes(bytes) {
-    if (bytes === 0) return "0 B";
+    if (!bytes || bytes === 0) return "0 B";
     const k = 1024;
     const sizes = ["B", "KB", "MB", "GB", "TB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));

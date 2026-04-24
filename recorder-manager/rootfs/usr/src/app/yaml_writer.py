@@ -97,6 +97,9 @@ class YamlWriter:
         Always writes the header comment first. If the section has no
         meaningful content, the file contains only the header.
         All list values are sorted for deterministic output.
+
+        Writes to a temporary file first, then atomically replaces the
+        target path to prevent half-written files on crash.
         """
         output: dict = {}
         if section.get("entities"):
@@ -106,7 +109,8 @@ class YamlWriter:
         if section.get("entity_globs"):
             output["entity_globs"] = sorted(section["entity_globs"])
 
-        with open(path, "w", encoding="utf-8") as f:
+        tmp_path = path + ".tmp"
+        with open(tmp_path, "w", encoding="utf-8") as f:
             f.write(_HEADER)
             if output:
                 yaml.dump(
@@ -116,6 +120,7 @@ class YamlWriter:
                     allow_unicode=True,
                     sort_keys=False,
                 )
+        os.replace(tmp_path, path)
         logger.debug(
             "Written %s (%d rules)",
             path,

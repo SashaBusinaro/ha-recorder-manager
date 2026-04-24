@@ -2,6 +2,7 @@
 
 import os
 import logging
+from contextlib import asynccontextmanager
 
 import aiohttp
 
@@ -20,8 +21,21 @@ class EntityResolver:
             logger.warning("SUPERVISOR_TOKEN not set")
         return token
 
-    async def get_all_entities(self) -> set:
-        """Return a set of all entity_ids currently registered in HA."""
+    @asynccontextmanager
+    async def _session(self, session=None):
+        """Yield an aiohttp session — reuse *session* if provided, else create one."""
+        if session is not None:
+            yield session
+        else:
+            async with aiohttp.ClientSession() as s:
+                yield s
+
+    async def get_all_entities(self, session=None) -> set:
+        """Return a set of all entity_ids currently registered in HA.
+
+        Args:
+            session: Optional shared ``aiohttp.ClientSession``.
+        """
         token = self._get_token()
         if not token:
             logger.warning(
@@ -35,8 +49,8 @@ class EntityResolver:
         }
 
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
+            async with self._session(session) as s:
+                async with s.get(
                     self.SUPERVISOR_URL,
                     headers=headers,
                     timeout=aiohttp.ClientTimeout(total=30),
@@ -61,3 +75,4 @@ class EntityResolver:
         except Exception as e:
             logger.error("Entity resolution failed: %s", e)
             return set()
+

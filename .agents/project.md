@@ -26,18 +26,24 @@ A Home Assistant add-on with an ingress-based web UI that provides:
    include/exclude filters using Home Assistant's native filter model:
    individual entities, entire domains, and entity glob patterns.
 
-3. **Recorder configuration file** — the add-on writes a standalone YAML
-   file (`recorder_filters.yaml`) into `/config/` that replaces the user's
-   entire `recorder:` block via `recorder: !include recorder_filters.yaml`.
-   Because HA YAML does not allow `!include` as a sub-key inside a block,
-   all recorder settings (filters, `purge_keep_days`, `commit_interval`,
-   etc.) are managed inside this file. The add-on **never** modifies
-   `configuration.yaml` or the database directly; it only influences
-   future recording behaviour.
+3. **Recorder filter files** — the add-on manages two standalone YAML
+   files (`recorder_include.yaml` and `recorder_exclude.yaml`) in
+   `/config/`. Each file contains only the filter definitions for its
+   direction (entities, domains, entity_globs). The user adds two
+   `!include` sub-keys inside their existing `recorder:` block:
+   ```yaml
+   recorder:
+     include: !include recorder_include.yaml
+     exclude: !include recorder_exclude.yaml
+   ```
+   All other recorder settings (`purge_keep_days`, `commit_interval`,
+   etc.) remain under user control in `configuration.yaml`. The add-on
+   **never** modifies `configuration.yaml` or the database directly;
+   it only influences future recording behaviour.
 
 The user installs the add-on, configures their filters visually, and applies
-the generated YAML with a single one-time edit to `configuration.yaml`:
-`recorder: !include recorder_filters.yaml`.
+the generated YAML with a one-time edit to `configuration.yaml` adding the
+two `!include` lines above.
 
 ## user and context
 
@@ -83,18 +89,22 @@ the generated YAML with a single one-time edit to `configuration.yaml`:
 - Show a live preview of which entities would be recorded vs. dropped based
   on the current filter configuration.
 
-### F3 — Recorder configuration file
-- Generate a valid standalone YAML file containing the **complete**
-  `recorder` configuration: include/exclude filters as well as any other
-  recorder settings (`purge_keep_days`, `commit_interval`, `db_url`,
-  `auto_purge`, `auto_repack`, `db_max_retries`, `db_retry_wait`).
-- Because HA YAML does not allow `!include` as a sub-key inside a block,
-  the user replaces their entire `recorder:` block with:
+### F3 — Recorder filter files
+- Generate two standalone YAML files containing the include/exclude filter
+  definitions: `recorder_include.yaml` and `recorder_exclude.yaml`.
+- Each file contains only the filter dict for its direction (entities,
+  domains, entity_globs) — no wrapping key.
+- The user adds two `!include` sub-keys inside their `recorder:` block:
   ```yaml
-  recorder: !include recorder_filters.yaml
+  recorder:
+    include: !include recorder_include.yaml
+    exclude: !include recorder_exclude.yaml
   ```
-- Write the file to `/config/recorder_filters.yaml`.
-- The add-on manages this file exclusively; the user never hand-edits it.
+- All other recorder settings (`purge_keep_days`, `commit_interval`,
+  etc.) remain under user control in `configuration.yaml`.
+- Write the files to `/config/recorder_include.yaml` and
+  `/config/recorder_exclude.yaml`.
+- The add-on manages these files exclusively; the user never hand-edits them.
 
 ### F4 — Ingress web UI
 - Single-page web interface served via HA Ingress (port 8099 by default).
@@ -131,10 +141,10 @@ the generated YAML with a single one-time edit to `configuration.yaml`:
 |---|---|
 | Platform | Home Assistant add-on (Supervisor managed) |
 | Architectures | amd64, aarch64 (multi-arch) |
-| Base image | `ghcr.io/home-assistant/base-python` — latest: `3.14-alpine3.23` |
+| Base image | `ghcr.io/home-assistant/base-python:3.13-alpine3.21` |
 | UI delivery | HA Ingress (`ingress: true`, port 8099) |
 | DB access | Read-only map of `/config/` to access `home-assistant_v2.db` |
-| Generated file location | `/config/recorder_filters.yaml` |
+| Generated file locations | `/config/recorder_include.yaml`, `/config/recorder_exclude.yaml` |
 | Supervisor API | `hassio_api: true`, `hassio_role: homeassistant`, `homeassistant_api: true` |
 | Auth | `SUPERVISOR_TOKEN` env var (auto-injected by Supervisor) |
 | Security | Custom `apparmor.txt` profile; no host network; read-only mappings where possible |

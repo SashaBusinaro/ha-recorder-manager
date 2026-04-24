@@ -50,3 +50,5 @@ Thumbs.db
 !.agents/architecture.md
 !.agents/changelog.md
 !.agents/project.md
+
+.claude/*

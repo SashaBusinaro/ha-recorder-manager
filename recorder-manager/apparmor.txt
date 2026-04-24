@@ -38,8 +38,10 @@ profile recorder-manager flags=(attach_disconnected,mediate_deleted) {
   # Write access to recorder_include.yaml and recorder_exclude.yaml
   /homeassistant/recorder_include.yaml rw,
   /homeassistant/recorder_include.yaml.bak rw,
+  /homeassistant/recorder_include.yaml.tmp rw,
   /homeassistant/recorder_exclude.yaml rw,
   /homeassistant/recorder_exclude.yaml.bak rw,
+  /homeassistant/recorder_exclude.yaml.tmp rw,
 
   # Network access (HTTP to Supervisor API)
   network inet stream,

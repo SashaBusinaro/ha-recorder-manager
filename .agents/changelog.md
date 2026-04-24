@@ -1,10 +1,33 @@
 # Changelog
 
-## 2026-04-24 — Entity Limit Selector
+## 2026-04-25 — Code Audit & v1.1.0 Release
+
+- implemented: Comprehensive code audit covering all 7 backend modules, 3 frontend files, infrastructure (Dockerfile, config.yaml, AppArmor, S6, CI), and documentation.
+- fixed (C1): `GET /api/entities` — `total` field now captured before limit slice; was returning sliced count instead of true total.
+- fixed (H1): SQLite connection in `_query_entity_stats` wrapped in `try/finally` — connection now always closed even when a query raises.
+- fixed (H3): `aiohttp.ClientSession` now created once on app startup (via `on_startup` hook) and closed on shutdown; `EntityResolver` and `SupervisorApi` accept an optional session parameter and fall back to creating their own only when needed.
+- fixed (H4): `yaml_writer._write_section` now writes to a `.tmp` file then calls `os.replace()` for atomic promotion; `apparmor.txt` updated with `.tmp` write permissions.
+- fixed (H5): `asyncio.create_task` result in `handle_setup_reboot` held in `_background_tasks` set with `add_done_callback` discard to prevent premature GC.
+- fixed (M3): Extracted `_evaluate_all_entities()` shared helper; both `_merge_entities` and `handle_preview_filters` now call it — no more duplicated filter evaluation loop.
+- fixed (M4): `_validate_filter_payload()` added and called on `POST /api/filters` and `POST /api/apply`; malformed payloads return HTTP 400.
+- fixed (M5): Replaced 60-second sliding window for `writes_per_minute` with a lifetime average: `COUNT(*) / (time_span_s / 60)`. Removed unused `import time`.
+- fixed (M6): `formatNumber()` and `formatBytes()` in `app.js` now guarded against `null`/`undefined` inputs.
+- fixed (M7): `populateDomainFilter()` in `app.js` now uses `escapeAttr(d)` on the option value and `escapeHtml(d)` on the display text.
+- fixed (H2 — docs): "Size" column header in `index.html` has a `title` tooltip explaining the value is an estimated/proportional metric due to shared attribute deduplication.
+- updated (M1): `project.md` — F3 section and hard constraints table updated from legacy `recorder_filters.yaml` single-file model to the actual dual-file architecture.
+- updated (M2): `architecture.md` — Technology Stack table corrected: Python 3.13, Alpine 3.21; version in config.yaml snippet bumped to 1.0.0.
+- verified: All 7 Python files pass `ast.parse()` syntax validation.
+- decision (M8): Table innerHTML re-render on sort/filter not addressed — acceptable with default limit=100.
+- decision (M9): Did not re-add `startup`/`boot`/`ingress_port`/`panel_admin` to `config.yaml` — user confirmed original linter-clean state is intentional.
+- decision (M10): Did not change `build-app.yaml` repository guard — user decision.
+- decision (L8): `example/` directory kept as-is.
+
+## 2026-04-24 — Entity Limit Selector (v1.1.0 feature)
 - implemented: `GET /api/entities?limit=N` — backend now accepts a `limit` query param; entities are sorted by `size_bytes` descending before slicing so the heaviest entities are always returned first. `limit=0` returns all entities (legacy behaviour).
 - implemented: "Top N" selector dropdown in the toolbar (values: 25 / 100 / 250 / 500 / All); default is **Top 100** to keep initial load fast on large HA installations.
 - implemented: Changing the selector triggers a live reload from the server and shows a toast with the number of entities loaded.
 - verified: Backward-compatible — clients that do not send the `limit` param receive the same full response as before.
+
 
 ## 2026-04-23 — Phase 3: v1.0.0 — Filter-Only Split-File Architecture
 

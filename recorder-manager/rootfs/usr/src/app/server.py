@@ -4,6 +4,7 @@ import os
 import logging
 import asyncio
 
+import aiohttp
 from aiohttp import web
 
 from db_reader import DbReader
@@ -30,6 +31,28 @@ entity_resolver = EntityResolver()
 filter_engine = FilterEngine()
 yaml_writer = YamlWriter(INCLUDE_FILE, EXCLUDE_FILE)
 supervisor_api = SupervisorApi()
+
+# Strong references for fire-and-forget tasks (prevent GC before completion)
+_background_tasks: set = set()
+
+
+def _validate_filter_payload(data: dict) -> None:
+    """Basic schema validation for filter payloads.
+
+    Raises ValueError if the structure is invalid.
+    """
+    if not isinstance(data, dict):
+        raise ValueError("Request body must be a JSON object")
+    for section in ("include", "exclude"):
+        block = data.get(section, {})
+        if block is None:
+            continue
+        if not isinstance(block, dict):
+            raise ValueError(f"'{section}' must be a dict")
+        for key in ("entities", "domains", "entity_globs"):
+            val = block.get(key)
+            if val is not None and not isinstance(val, list):
+                raise ValueError(f"'{section}.{key}' must be a list")
 
 
 def _get_ingress_path(request: web.Request) -> str:
@@ -95,6 +118,7 @@ async def handle_entities(request: web.Request) -> web.Response:
         ha_entities = await entity_resolver.get_all_entities()
         current_filters = yaml_writer.read_filters()
         merged = _merge_entities(db_stats, ha_entities, current_filters)
+        total = len(merged)
 
         # Apply limit: entities are already sorted by entity_id in _merge_entities;
         # re-sort by size_bytes desc so the most significant ones survive the slice.
@@ -102,7 +126,7 @@ async def handle_entities(request: web.Request) -> web.Response:
             merged.sort(key=lambda e: e.get("size_bytes", 0), reverse=True)
             merged = merged[:limit]
 
-        return web.json_response({"entities": merged, "limit": limit, "total": len(merged)})
+        return web.json_response({"entities": merged, "limit": limit, "total": total})
     except Exception as e:
         logger.error("Entities error: %s", e)
         return web.json_response({"error": str(e)}, status=500)
@@ -178,7 +202,9 @@ async def handle_setup_reboot(request: web.Request) -> web.Response:
         except Exception as e:
             logger.error("Reboot error: %s", e)
 
-    asyncio.create_task(_restart())
+    task = asyncio.create_task(_restart())
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
     return web.json_response({"status": "rebooting"})
 
 
@@ -235,8 +261,11 @@ async def handle_save_filters(request: web.Request) -> web.Response:
     """Save new filter configuration (without applying)."""
     try:
         data = await request.json()
+        _validate_filter_payload(data)
         yaml_writer.write_filters(data)
         return web.json_response({"status": "saved"})
+    except ValueError as e:
+        return web.json_response({"error": str(e)}, status=400)
     except Exception as e:
         logger.error("Save filters error: %s", e)
         return web.json_response({"error": str(e)}, status=500)
@@ -253,14 +282,11 @@ async def handle_preview_filters(request: web.Request) -> web.Response:
         ha_entities = await entity_resolver.get_all_entities()
         all_entity_ids = set(db_stats.keys()) | ha_entities
 
-        results = []
-        for entity_id in sorted(all_entity_ids):
-            status, reason = filter_engine.evaluate(entity_id, include, exclude)
-            results.append({
-                "entity_id": entity_id,
-                "status": status,
-                "reason": reason,
-            })
+        results = [
+            {"entity_id": eid, "status": status, "reason": reason}
+            for eid, (status, reason)
+            in _evaluate_all_entities(all_entity_ids, include, exclude)
+        ]
 
         return web.json_response({"entities": results})
     except Exception as e:
@@ -272,6 +298,7 @@ async def handle_apply(request: web.Request) -> web.Response:
     """Write filters, validate config, and restart HA Core."""
     try:
         data = await request.json()
+        _validate_filter_payload(data)
 
         # 1. Backup and write new filters
         yaml_writer.backup()
@@ -316,6 +343,20 @@ async def handle_apply(request: web.Request) -> web.Response:
         return web.json_response({"error": str(e)}, status=500)
 
 
+def _evaluate_all_entities(
+    entity_ids: set, include: dict, exclude: dict
+) -> list:
+    """Evaluate filters for a set of entities.
+
+    Returns a sorted list of (entity_id, (status, reason)) tuples.
+    Shared by _merge_entities and handle_preview_filters.
+    """
+    return [
+        (eid, filter_engine.evaluate(eid, include, exclude))
+        for eid in sorted(entity_ids)
+    ]
+
+
 def _merge_entities(
     db_stats: dict, ha_entities: set, current_filters: dict
 ) -> list:
@@ -326,9 +367,10 @@ def _merge_entities(
     all_entity_ids = set(db_stats.keys()) | ha_entities
     merged = []
 
-    for entity_id in sorted(all_entity_ids):
+    for entity_id, (status, reason) in _evaluate_all_entities(
+        all_entity_ids, include, exclude
+    ):
         stats = db_stats.get(entity_id, {})
-        status, reason = filter_engine.evaluate(entity_id, include, exclude)
         domain = entity_id.split(".")[0] if "." in entity_id else ""
 
         merged.append({
@@ -349,6 +391,16 @@ def _merge_entities(
 def create_app() -> web.Application:
     """Create and configure the aiohttp application."""
     app = web.Application(middlewares=[ingress_security])
+
+    # Shared HTTP client session — created once, reused across all requests
+    async def on_startup(a: web.Application):
+        a["client_session"] = aiohttp.ClientSession()
+
+    async def on_cleanup(a: web.Application):
+        await a["client_session"].close()
+
+    app.on_startup.append(on_startup)
+    app.on_cleanup.append(on_cleanup)
 
     # API routes
     app.router.add_get("/", handle_index)

@@ -47,8 +47,8 @@ recorder filter management.
 
 | Layer | Choice | Rationale |
 |---|---|---|
-| Language | Python 3.14 | Base image provides it; ecosystem has sqlite3, aiohttp, PyYAML |
-| Base image | `ghcr.io/home-assistant/base-python:3.14-alpine3.23` | Latest HA Python image; Alpine for IoT-friendly footprint |
+| Language | Python 3.13 | Base image provides it; ecosystem has sqlite3, aiohttp, PyYAML |
+| Base image | `ghcr.io/home-assistant/base-python:3.13-alpine3.21` | HA Python image; Alpine for IoT-friendly footprint |
 | Web framework | aiohttp | Lightweight async HTTP server; no heavy deps; supports ingress path rewriting natively |
 | Database access | Python `sqlite3` stdlib | Zero additional deps; read-only connection with `?mode=ro` URI |
 | YAML generation | PyYAML | Standard Python YAML library; generates valid HA-compatible YAML |
@@ -266,7 +266,7 @@ GET /api/entities
 
 ```yaml
 name: Recorder Manager
-version: "0.1.0"
+version: "1.0.0"
 slug: recorder-manager
 description: >-
   Visual database analytics and recorder filter manager.
