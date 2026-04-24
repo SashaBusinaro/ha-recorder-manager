@@ -19,6 +19,8 @@ recorded by the Home Assistant Recorder integration. It helps you:
 The add-on is **read-only** for both the database and `configuration.yaml`.
 It only writes to its dedicated `recorder_include.yaml` and `recorder_exclude.yaml` files.
 
+> **Note:** Currently, this add-on only supports the default SQLite database engine.
+
 Particularly useful for Raspberry Pi / SD card setups where minimizing
 database writes extends storage lifespan.
 

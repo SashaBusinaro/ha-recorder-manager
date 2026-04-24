@@ -15,6 +15,22 @@ Visual database analytics and recorder filter manager for Home Assistant.
 See which entities consume the most space and writes, then build
 include/exclude filters with a click.
 
+> **Note:** Currently, this add-on only supports the default SQLite database engine.
+
+## Screenshots
+
+**Main Dashboard**  
+Shows database size by entity and allows managing include/exclude filters.
+![Main Dashboard](images/main.png)
+
+**Chattiness Analysis**  
+Real-time analysis of the most talkative entities.
+![Chattiness Analysis](images/chattiness.png)
+
+**Setup Wizard**  
+Guides you through initial configuration and migration of existing filters.
+![Setup Wizard](images/setup-wizard.png)
+
 ## Installation
 
 1. Click the button above to add this repository to your Home Assistant.
