@@ -72,8 +72,7 @@
   // ===== Data Loading =====
   async function loadEntities() {
     try {
-      const qs = state.limit > 0 ? `?limit=${state.limit}` : "";
-      const data = await api(`/api/entities${qs}`);
+      const data = await api("/api/entities");
       state.entities = data.entities || [];
       populateDomainFilter();
       renderTable();
@@ -148,6 +147,11 @@
       }
       return mult * (va - vb);
     });
+
+    // Apply Top N limit after filtering and sorting
+    if (state.limit > 0 && list.length > state.limit) {
+      list = list.slice(0, state.limit);
+    }
 
     return list;
   }
@@ -461,17 +465,10 @@
       renderTable();
     });
 
-    // Entity limit selector — triggers a server-side reload
-    dom.limitSelect.addEventListener("change", async (e) => {
+    // Entity limit selector — client-side, just re-render
+    dom.limitSelect.addEventListener("change", (e) => {
       state.limit = parseInt(e.target.value, 10);
-      dom.btnRefresh.disabled = true;
-      try {
-        await loadEntities();
-        const label = state.limit > 0 ? `Top ${state.limit} entities loaded` : "All entities loaded";
-        showToast(label, "info");
-      } finally {
-        dom.btnRefresh.disabled = false;
-      }
+      renderTable();
     });
 
     // Refresh

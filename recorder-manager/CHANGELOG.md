@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.1.1] - 2026-04-25
+
+### Changed
+- **Entity limit selector**: Refactored to apply filtering client-side instead of
+  server-side. The `GET /api/entities` endpoint no longer accepts a `limit`
+  query parameter and always returns the complete entity list. Changing the
+  limit selector now triggers a local re-render instead of a server reload,
+  improving responsiveness and reducing network overhead.
+
+### Optimized
+- **Screenshot images**: Recompressed all screenshots (main.png, chattiness.png,
+  setup-wizard.png) for reduced file size.
+
 ## [1.1.0] - 2026-04-25
 
 ### Added

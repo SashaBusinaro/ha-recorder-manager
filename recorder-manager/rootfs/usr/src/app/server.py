@@ -100,33 +100,14 @@ async def handle_db_overview(request: web.Request) -> web.Response:
 
 
 async def handle_entities(request: web.Request) -> web.Response:
-    """Return merged entity list with stats and filter status.
-
-    Query parameters:
-      limit (int, optional): Maximum number of entities to return.
-        Entities are sorted by size_bytes descending before slicing so
-        the caller always receives the heaviest entities first.
-        A value of 0 (or omitting the parameter) returns all entities.
-    """
+    """Return merged entity list with stats and filter status."""
     try:
-        try:
-            limit = int(request.rel_url.query.get("limit", "0"))
-        except ValueError:
-            limit = 0
-
         db_stats = await db_reader.get_entity_stats()
         ha_entities = await entity_resolver.get_all_entities()
         current_filters = yaml_writer.read_filters()
         merged = _merge_entities(db_stats, ha_entities, current_filters)
-        total = len(merged)
 
-        # Apply limit: entities are already sorted by entity_id in _merge_entities;
-        # re-sort by size_bytes desc so the most significant ones survive the slice.
-        if limit and limit > 0:
-            merged.sort(key=lambda e: e.get("size_bytes", 0), reverse=True)
-            merged = merged[:limit]
-
-        return web.json_response({"entities": merged, "limit": limit, "total": total})
+        return web.json_response({"entities": merged, "total": len(merged)})
     except Exception as e:
         logger.error("Entities error: %s", e)
         return web.json_response({"error": str(e)}, status=500)

@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-04-25 — v1.1.1 Release: Client-Side Limit & Image Optimization
+
+- refactored: Entity limit selector now applies filtering client-side instead of server-side. `GET /api/entities` no longer accepts a `limit` parameter and always returns all entities. The `limitSelect` change handler now triggers a local re-render instead of a server reload, improving responsiveness and reducing network overhead.
+- optimized: Screenshot images (main.png, chattiness.png, setup-wizard.png) recompressed for reduced bundle size.
+- verified: Backward-compatible — clients that don't use the limit selector receive the same full entity list as before.
+
 ## 2026-04-25 — Code Audit & v1.1.0 Release
 
 - implemented: Comprehensive code audit covering all 7 backend modules, 3 frontend files, infrastructure (Dockerfile, config.yaml, AppArmor, S6, CI), and documentation.
