@@ -21,15 +21,27 @@ include/exclude filters with a click.
 
 **Main Dashboard**  
 Shows database size by entity and allows managing include/exclude filters.
-![Main Dashboard](images/main.png)
+
+<p>
+  <img src="images/main-light.png#gh-light-mode-only" alt="Main Dashboard">
+  <img src="images/main-dark.png#gh-dark-mode-only" alt="Main Dashboard">
+</p>
 
 **Chattiness Analysis**  
 Real-time analysis of the most talkative entities.
-![Chattiness Analysis](images/chattiness.png)
+
+<p>
+  <img src="images/chattiness-light.png#gh-light-mode-only" alt="Chattiness Analysis">
+  <img src="images/chattiness-dark.png#gh-dark-mode-only" alt="Chattiness Analysis">
+</p>
 
 **Setup Wizard**  
 Guides you through initial configuration and migration of existing filters.
-![Setup Wizard](images/setup-wizard.png)
+
+<p>
+  <img src="images/setup-light.png#gh-light-mode-only" alt="Setup Wizard">
+  <img src="images/setup-dark.png#gh-dark-mode-only" alt="Setup Wizard">
+</p>
 
 ## Installation
 

@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.2.0] - 2026-04-27
+
+### Added
+- **Light/dark/auto theme toggle**: Toolbar button cycles through Light, Dark, and Auto (system) themes. Preference is persisted in `localStorage`. Auto mode follows the OS color scheme via `prefers-color-scheme`.
+- **Entity display count**: Toolbar now shows "N of M" entities after filtering, giving immediate feedback on how many entities match the current search/domain/status filter.
+- **Clear filter button**: Each entity row now shows a "Clear" action button when the entity is already in an include or exclude rule, allowing one-click removal from the rule without opening the filter panel.
+- **Improved empty states**: Contextual empty-state messages explain why the table is empty (e.g., no results for a search term, no entities in a domain, no included/excluded entities).
+- **Rule chip**: The "Reason" column is replaced by a compact chip in the Status cell showing the matched rule kind (entity, glob, domain, or no filter) with a tooltip for the full reason.
+
+### Changed
+- **Full light theme**: The UI now defaults to a light color scheme. Dark mode activates via system preference or the manual toggle.
+- **Status column**: Merged the former "Reason" column into the Status cell as a hoverable rule chip; table is now 6 columns wide.
+- **Sort highlight**: The active sort column header is now highlighted in the primary color.
+- **Info icon on Size header**: The Size column header shows an inline info icon to indicate the tooltip.
+
 ## [1.1.1] - 2026-04-25
 
 ### Changed

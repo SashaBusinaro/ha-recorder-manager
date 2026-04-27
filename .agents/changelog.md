@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-04-27 — v1.2.0 Release: Light/Dark Theme & UI Polish
+
+- implemented: Full light/dark/auto theme system. CSS design tokens split into `:root` (light), `[data-theme="dark"]`, and `@media (prefers-color-scheme: dark)` blocks. Smooth transitions on all major surfaces via `--transition-theme`.
+- implemented: Theme toggle button in toolbar — cycles auto → light → dark; preference persisted in `localStorage`.
+- implemented: Entity display count label ("N of M") in toolbar, updated on every filter/search change.
+- implemented: Clear filter button per entity row — removes entity from include or exclude rule without opening the filter panel.
+- implemented: Contextual empty-state messages — different copy for search, domain, status, and default states.
+- implemented: Rule chip in Status column — shows matched rule kind (entity/glob/domain/no filter) as a badge with tooltip; "Reason" column removed; colspan reduced from 7 to 6.
+- implemented: Active sort column highlighted in primary color.
+- implemented: Info icon on Size column header (tooltip indicator).
+- implemented: `color-scheme` meta tag for native browser scrollbar theming.
+- updated: README screenshots replaced with light-themed variants (`*-light.png`); old single-theme screenshots removed.
+- updated: `config.yaml` version bumped to 1.2.0.
+
 ## 2026-04-25 — v1.1.1 Release: Client-Side Limit & Image Optimization
 
 - refactored: Entity limit selector now applies filtering client-side instead of server-side. `GET /api/entities` no longer accepts a `limit` parameter and always returns all entities. The `limitSelect` change handler now triggers a local re-render instead of a server reload, improving responsiveness and reducing network overhead.

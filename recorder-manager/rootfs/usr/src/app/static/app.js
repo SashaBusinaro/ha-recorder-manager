@@ -7,6 +7,55 @@
 (function () {
   "use strict";
 
+  // ===== Theme Management =====
+  const THEME_MODES = ["auto", "light", "dark"];
+  const THEME_TITLES = {
+    auto: "Theme: Auto",
+    light: "Theme: Light",
+    dark: "Theme: Dark",
+  };
+  const THEME_STORE_KEY = "rm-ui-theme";
+  const THEME_ICON_PATHS = {
+    auto: "M12 2A10 10 0 0 0 2 12 10 10 0 0 0 12 22 10 10 0 0 0 22 12 10 10 0 0 0 12 2M12 4V20A8 8 0 0 1 4 12 8 8 0 0 1 12 4Z",
+    light:
+      "M12 7C9.24 7 7 9.24 7 12S9.24 17 12 17 17 14.76 17 12 14.76 7 12 7M12 2L14.39 5.42C13.65 5.15 12.84 5 12 5S10.35 5.15 9.61 5.42L12 2M2 12L5.42 9.61C5.15 10.35 5 11.16 5 12S5.15 13.65 5.42 14.39L2 12M12 22L9.61 18.58C10.35 18.85 11.16 19 12 19S13.65 18.85 14.39 18.58L12 22M22 12L18.58 14.39C18.85 13.65 19 12.84 19 12S18.85 10.35 18.58 9.61L22 12",
+    dark: "M17.75 4.09L15.22 6.03L16.13 9.09L13.5 7.28L10.87 9.09L11.78 6.03L9.25 4.09L12.44 4L13.5 1L14.56 4L17.75 4.09M21.25 11L19.61 12.25L20.2 14.23L18.5 13.06L16.8 14.23L17.39 12.25L15.75 11L17.81 10.95L18.5 9L19.19 10.95L21.25 11M18.97 15.95C19.8 15.87 20.69 17.05 20.16 17.8C19.84 18.25 19.5 18.67 19.08 19.07C15.17 23 8.84 23 4.94 19.07C1.03 15.17 1.03 8.83 4.94 4.93C5.34 4.53 5.76 4.17 6.21 3.85C6.96 3.32 8.14 4.21 8.06 5.04C7.79 7.9 8.75 10.87 10.95 13.06C13.14 15.26 16.1 16.22 18.97 15.95Z",
+  };
+
+  function applyTheme(mode, save) {
+    const html = document.documentElement;
+    if (mode === "auto") html.removeAttribute("data-theme");
+    else html.setAttribute("data-theme", mode);
+    if (save) localStorage.setItem(THEME_STORE_KEY, mode);
+    const btn = document.getElementById("btn-theme");
+    if (btn) btn.title = THEME_TITLES[mode] || "Theme";
+    const icon = document.getElementById("theme-icon");
+    if (icon)
+      icon.innerHTML = `<path fill="currentColor" d="${THEME_ICON_PATHS[mode] || THEME_ICON_PATHS.auto}"/>`;
+  }
+
+  function cycleTheme() {
+    const current =
+      document.documentElement.getAttribute("data-theme") || "auto";
+    const next =
+      THEME_MODES[(THEME_MODES.indexOf(current) + 1) % THEME_MODES.length];
+    applyTheme(next, true);
+  }
+
+  // Restore saved preference on load
+  (function () {
+    const saved = localStorage.getItem(THEME_STORE_KEY) || "auto";
+    applyTheme(saved, false);
+    if (window.matchMedia) {
+      window
+        .matchMedia("(prefers-color-scheme: dark)")
+        .addEventListener("change", function () {
+          const current = localStorage.getItem(THEME_STORE_KEY) || "auto";
+          if (current === "auto") applyTheme("auto", false);
+        });
+    }
+  })();
+
   // ===== Base Path (injected by server from X-Ingress-Path) =====
   const BASE_PATH = document.body.dataset.ingressPath || "";
 
@@ -18,7 +67,7 @@
     search: "",
     domainFilter: "",
     statusFilter: "",
-    limit: 100,   // matches the <option selected> in index.html
+    limit: 100, // matches the <option selected> in index.html
     dirty: false,
   };
 
@@ -44,6 +93,7 @@
     btnCancelApply: $("#btn-cancel-apply"),
     btnConfirmApply: $("#btn-confirm-apply"),
     toastContainer: $("#toast-container"),
+    entityDisplayCount: $("#entity-display-count"),
   };
 
   // ===== Tag Inputs =====
@@ -124,7 +174,7 @@
       list = list.filter(
         (e) =>
           e.entity_id.toLowerCase().includes(q) ||
-          e.domain.toLowerCase().includes(q)
+          e.domain.toLowerCase().includes(q),
       );
     }
 
@@ -156,12 +206,100 @@
     return list;
   }
 
+  const INFO_ICON_SVG = `<svg class="info-icon" viewBox="0 0 24 24"><path fill="currentColor" d="M11,9H13V7H11M12,20C7.59,20 4,16.41 4,12C4,7.59 7.59,4 12,4C16.41,4 20,7.59 20,12C20,16.41 16.41,20 12,20M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M11,17H13V11H11V17Z"/></svg>`;
+
+  function getEmptyStateMessage() {
+    if (state.search && state.domainFilter) {
+      return {
+        main: "No entities found",
+        sub: `No results for "${escapeHtml(state.search)}" in the ${escapeHtml(state.domainFilter)} domain.`,
+      };
+    }
+    if (state.search) {
+      return {
+        main: "No entities found",
+        sub: `No results for "${escapeHtml(state.search)}". Try a different search term.`,
+      };
+    }
+    if (state.domainFilter) {
+      return {
+        main: "No entities found",
+        sub: `No entities recorded in the ${escapeHtml(state.domainFilter)} domain.`,
+      };
+    }
+    if (state.statusFilter === "included") {
+      return {
+        main: "No included entities",
+        sub: "No entities are currently included by your filter rules.",
+      };
+    }
+    if (state.statusFilter === "excluded") {
+      return {
+        main: "No excluded entities",
+        sub: "No entities are currently excluded by your filter rules.",
+      };
+    }
+    return {
+      main: "No entities found",
+      sub: "Try refreshing or adjusting the load limit.",
+    };
+  }
+
+  function getEntityRuleState(entityId) {
+    const inc = (state.filters.include && state.filters.include.entities) || [];
+    const exc = (state.filters.exclude && state.filters.exclude.entities) || [];
+    if (inc.includes(entityId)) return "in_include";
+    if (exc.includes(entityId)) return "in_exclude";
+    return "none";
+  }
+
+  function getRuleKind(reason) {
+    if (!reason) return "default";
+    if (reason.startsWith("entity ")) return "entity";
+    if (reason.startsWith("glob ")) return "glob";
+    if (reason.startsWith("domain ")) return "domain";
+    return "default";
+  }
+
+  function renderActionButtons(entityId, ruleState) {
+    const eid = escapeAttr(entityId);
+    if (ruleState === "in_include") {
+      return `
+        <button class="btn btn-sm btn-exclude" data-action="exclude" data-entity="${eid}">Exclude</button>
+        <button class="btn btn-sm btn-clear" data-action="clear" data-entity="${eid}" title="Remove from include rule">Clear</button>
+      `;
+    }
+    if (ruleState === "in_exclude") {
+      return `
+        <button class="btn btn-sm btn-include" data-action="include" data-entity="${eid}">Include</button>
+        <button class="btn btn-sm btn-clear" data-action="clear" data-entity="${eid}" title="Remove from exclude rule">Clear</button>
+      `;
+    }
+    return `
+      <button class="btn btn-sm btn-include" data-action="include" data-entity="${eid}">Include</button>
+      <button class="btn btn-sm btn-exclude" data-action="exclude" data-entity="${eid}">Exclude</button>
+    `;
+  }
+
   function renderTable() {
     const entities = getFilteredEntities();
+
+    if (dom.entityDisplayCount) {
+      const total = state.entities.length;
+      dom.entityDisplayCount.textContent =
+        total > 0
+          ? `${entities.length.toLocaleString()} of ${total.toLocaleString()}`
+          : "";
+    }
+
     if (entities.length === 0) {
+      const { main, sub } = getEmptyStateMessage();
       dom.tbody.innerHTML = `
-        <tr><td colspan="7" style="text-align:center;padding:40px;color:var(--color-text-secondary)">
-          No entities found
+        <tr><td colspan="6">
+          <div class="empty-state">
+            <p class="empty-state-title">${main}</p>
+            <p class="empty-state-sub">${sub}</p>
+          </div>
         </td></tr>`;
       return;
     }
@@ -172,21 +310,26 @@
         const statusClass = isExcluded ? "status-excluded" : "status-included";
         const rowClass = isExcluded ? "excluded-row" : "";
         const statusLabel = isExcluded ? "Excluded" : "Included";
+        const ruleKind = getRuleKind(e.filter_reason);
+        const ruleState = getEntityRuleState(e.entity_id);
 
         return `<tr class="${rowClass}">
           <td class="entity-id-cell">${escapeHtml(e.entity_id)}</td>
           <td class="domain-cell">${escapeHtml(e.domain)}</td>
           <td class="numeric-cell">${formatBytes(e.size_bytes)}</td>
           <td class="numeric-cell">${e.writes_per_minute.toFixed(2)}</td>
-          <td><span class="status-badge ${statusClass}">${statusLabel}</span></td>
-          <td class="reason-cell">${escapeHtml(e.filter_reason)}</td>
+          <td>
+            <div class="status-cell">
+              <span class="status-badge ${statusClass}">${statusLabel}</span>
+              <span class="rule-chip rule-${ruleKind}" title="${escapeAttr(e.filter_reason)}">
+                <span>${ruleKind === "default" ? "no filter" : ruleKind}</span>
+                ${INFO_ICON_SVG}
+              </span>
+            </div>
+          </td>
           <td>
             <div class="action-buttons">
-              ${
-                isExcluded
-                  ? `<button class="btn btn-sm btn-include" data-action="include" data-entity="${escapeAttr(e.entity_id)}">Include</button>`
-                  : `<button class="btn btn-sm btn-exclude" data-action="exclude" data-entity="${escapeAttr(e.entity_id)}">Exclude</button>`
-              }
+              ${renderActionButtons(e.entity_id, ruleState)}
             </div>
           </td>
         </tr>`;
@@ -203,12 +346,14 @@
   }
 
   function populateDomainFilter() {
-    const domains = [
-      ...new Set(state.entities.map((e) => e.domain)),
-    ].sort();
+    const domains = [...new Set(state.entities.map((e) => e.domain))].sort();
     dom.domainFilter.innerHTML =
       '<option value="">All Domains</option>' +
-      domains.map((d) => `<option value="${escapeAttr(d)}">${escapeHtml(d)}</option>`).join("");
+      domains
+        .map(
+          (d) => `<option value="${escapeAttr(d)}">${escapeHtml(d)}</option>`,
+        )
+        .join("");
   }
 
   // ===== Tag Input Management =====
@@ -262,7 +407,7 @@
     container.innerHTML = tagInputs[inputId].values
       .map(
         (v, i) =>
-          `<span class="tag">${escapeHtml(v)}<button class="tag-remove" data-input="${inputId}" data-index="${i}">&times;</button></span>`
+          `<span class="tag">${escapeHtml(v)}<button class="tag-remove" data-input="${inputId}" data-index="${i}">&times;</button></span>`,
       )
       .join("");
 
@@ -333,6 +478,19 @@
     previewFilters();
   }
 
+  function clearEntityFilter(entityId) {
+    ["include", "exclude"].forEach((type) => {
+      if (state.filters[type] && state.filters[type].entities) {
+        state.filters[type].entities = state.filters[type].entities.filter(
+          (e) => e !== entityId,
+        );
+      }
+    });
+    syncTagInputsFromState();
+    markDirty();
+    previewFilters();
+  }
+
   async function previewFilters() {
     try {
       const data = await api("/api/filters/preview", {
@@ -375,7 +533,10 @@
       dom.modalOverlay.hidden = true;
       state.dirty = false;
       dom.btnApply.disabled = true;
-      showToast(data.message || "Filters applied. Home Assistant is restarting.", "success");
+      showToast(
+        data.message || "Filters applied. Home Assistant is restarting.",
+        "success",
+      );
     } catch (err) {
       dom.modalOverlay.hidden = true;
       showToast("Apply failed: " + err.message, "error");
@@ -441,7 +602,8 @@
           state.sort.dir = state.sort.dir === "asc" ? "desc" : "asc";
         } else {
           state.sort.key = key;
-          state.sort.dir = key === "entity_id" || key === "domain" ? "asc" : "desc";
+          state.sort.dir =
+            key === "entity_id" || key === "domain" ? "asc" : "desc";
         }
         renderTable();
       });
@@ -470,6 +632,9 @@
       state.limit = parseInt(e.target.value, 10);
       renderTable();
     });
+
+    // Theme toggle
+    document.getElementById("btn-theme").addEventListener("click", cycleTheme);
 
     // Refresh
     dom.btnRefresh.addEventListener("click", refresh);
@@ -510,7 +675,13 @@
     dom.tbody.addEventListener("click", (e) => {
       const btn = e.target.closest("[data-action]");
       if (!btn) return;
-      addEntityFilter(btn.dataset.entity, btn.dataset.action);
+      const action = btn.dataset.action;
+      const entityId = btn.dataset.entity;
+      if (action === "clear") {
+        clearEntityFilter(entityId);
+      } else {
+        addEntityFilter(entityId, action);
+      }
     });
   }
 
@@ -521,8 +692,11 @@
 
   // All wizard step IDs
   const ALL_STEPS = [
-    "wiz-mig-1", "wiz-mig-2", "wiz-mig-3",
-    "wiz-fresh-1", "wiz-fresh-2",
+    "wiz-mig-1",
+    "wiz-mig-2",
+    "wiz-mig-3",
+    "wiz-fresh-1",
+    "wiz-fresh-2",
   ];
 
   function wizShowOnly(stepId) {
@@ -546,7 +720,15 @@
   }
 
   // ---- Shared check-and-reboot flow ----
-  async function wizRunCheckAndReboot(spinnerEl, successEl, errorEl, footerEl, backBtn, closeBtn, titleEl) {
+  async function wizRunCheckAndReboot(
+    spinnerEl,
+    successEl,
+    errorEl,
+    footerEl,
+    backBtn,
+    closeBtn,
+    titleEl,
+  ) {
     // Show spinner
     spinnerEl.hidden = false;
     successEl.hidden = true;
@@ -568,11 +750,12 @@
 
       // Step 2: trigger reboot (fire-and-forget from client side)
       api("/api/setup/reboot", { method: "POST" }).catch(() => {});
-
     } catch (err) {
       spinnerEl.hidden = true;
       errorEl.hidden = false;
-      errorEl.textContent = "\u26a0 Validation failed: " + err.message +
+      errorEl.textContent =
+        "\u26a0 Validation failed: " +
+        err.message +
         " — Please re-check your configuration.yaml and try again.";
       if (titleEl) titleEl.textContent = "Validation Failed";
       footerEl.hidden = false;
@@ -587,9 +770,9 @@
     wizLock();
 
     const spinner = $("#wiz-mig-copy-spinner");
-    const done    = $("#wiz-mig-copy-done");
-    const errBox  = $("#wiz-mig-copy-error");
-    const footer  = $("#wiz-mig-2-footer");
+    const done = $("#wiz-mig-copy-done");
+    const errBox = $("#wiz-mig-copy-error");
+    const footer = $("#wiz-mig-2-footer");
 
     spinner.hidden = false;
     done.hidden = true;
@@ -661,7 +844,7 @@
       const data = await api("/api/setup/status");
       if (data.setup_complete) return;
 
-      const banner    = $("#setup-banner");
+      const banner = $("#setup-banner");
       const bannerMsg = $("#setup-banner-msg");
       const bannerCta = $("#setup-banner-cta");
 
@@ -690,23 +873,28 @@
   }
 
   function bindWizardEvents() {
-    const b = (id, fn) => { const el = $(id); if (el) el.addEventListener("click", fn); };
+    const b = (id, fn) => {
+      const el = $(id);
+      if (el) el.addEventListener("click", fn);
+    };
 
     // Banner dismiss
-    b("#setup-banner-dismiss", () => { $("#setup-banner").hidden = true; });
+    b("#setup-banner-dismiss", () => {
+      $("#setup-banner").hidden = true;
+    });
 
     // Migration wizard
     b("#wiz-mig-1-cancel", () => wizHide());
-    b("#wiz-mig-1-next",   () => wizMigStart());
-    b("#wiz-mig-2-next",   () => wizMigCheckReboot());
-    b("#wiz-mig-3-back",   () => wizShowOnly("wiz-mig-2"));
-    b("#wiz-mig-3-close",  () => wizHide());
+    b("#wiz-mig-1-next", () => wizMigStart());
+    b("#wiz-mig-2-next", () => wizMigCheckReboot());
+    b("#wiz-mig-3-back", () => wizShowOnly("wiz-mig-2"));
+    b("#wiz-mig-3-close", () => wizHide());
 
     // Fresh-setup wizard
     b("#wiz-fresh-1-cancel", () => wizHide());
-    b("#wiz-fresh-1-next",   () => wizFreshStart().then(wizFreshCheckReboot));
-    b("#wiz-fresh-2-back",   () => wizShowOnly("wiz-fresh-1"));
-    b("#wiz-fresh-2-close",  () => wizHide());
+    b("#wiz-fresh-1-next", () => wizFreshStart().then(wizFreshCheckReboot));
+    b("#wiz-fresh-2-back", () => wizShowOnly("wiz-fresh-1"));
+    b("#wiz-fresh-2-close", () => wizHide());
 
     // Backdrop click — only when closable
     if (setupOverlay) {
