@@ -19,7 +19,7 @@ include/exclude filters with a click.
 
 ## Screenshots
 
-**Main Dashboard**  
+**Main Dashboard**
 Shows database size by entity and allows managing include/exclude filters.
 
 <p>
@@ -27,7 +27,7 @@ Shows database size by entity and allows managing include/exclude filters.
   <img src="images/main-dark.png#gh-dark-mode-only" alt="Main Dashboard">
 </p>
 
-**Chattiness Analysis**  
+**Chattiness Analysis**
 Real-time analysis of the most talkative entities.
 
 <p>
@@ -35,7 +35,7 @@ Real-time analysis of the most talkative entities.
   <img src="images/chattiness-dark.png#gh-dark-mode-only" alt="Chattiness Analysis">
 </p>
 
-**Setup Wizard**  
+**Setup Wizard**
 Guides you through initial configuration and migration of existing filters.
 
 <p>
@@ -51,3 +51,10 @@ Guides you through initial configuration and migration of existing filters.
 
 [aarch64-shield]: https://img.shields.io/badge/aarch64-yes-green.svg
 [amd64-shield]: https://img.shields.io/badge/amd64-yes-green.svg
+
+---
+
+## 🤖 AI-Assisted Development
+
+> [!NOTE]
+> **Transparency Notice:** This integration was developed with assistance from AI coding agents (GitHub Copilot, Claude, and others). If you encounter unexpected behavior, please [open an issue](../../issues) on GitHub.
